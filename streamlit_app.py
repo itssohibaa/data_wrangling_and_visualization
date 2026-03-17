@@ -1,38 +1,50 @@
 import streamlit as st
 import time
 
-# --- PAGE CONFIG ---
 st.set_page_config(page_title="AI Data Wrangler", layout="wide")
 
 # --- SESSION INIT ---
-if "intro_time" not in st.session_state:
-    st.session_state.intro_time = time.time()
+if "intro_done" not in st.session_state:
+    st.session_state.intro_done = False
 
-# --- INTRO SCREEN (5 seconds) ---
-if time.time() - st.session_state.intro_time < 5:
+# --- FULLSCREEN STYLE ---
+st.markdown("""
+<style>
+.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: black;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    z-index: 999999;
+    text-align: center;
+    color: white;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# --- INTRO SCREEN ---
+if not st.session_state.intro_done:
+
     st.markdown("""
-    <div style="
-        position: fixed;
-        top: 0; left: 0;
-        width: 100vw; height: 100vh;
-        background: black;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        flex-direction: column;
-        z-index: 9999;
-        color: white;
-        text-align: center;
-    ">
+    <div class="fullscreen">
         <h1 style="font-size:70px;">🎉 Made by Violetta & Sohiba 🎉</h1>
         <h2>(Hope it is 90+ 😄)</h2>
     </div>
     """, unsafe_allow_html=True)
 
     st.balloons()
-    st.stop()
+    time.sleep(5)   # ✅ ONLY CHANGE (was 1 second)
 
-# --- MAIN APP ---
+    st.session_state.intro_done = True
+    st.rerun()
+
+# --- MAIN LANDING ---
 st.title("AI-Assisted Data Wrangler & Visualizer")
 
 st.markdown("""
