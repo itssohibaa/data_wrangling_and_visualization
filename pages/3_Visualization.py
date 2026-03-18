@@ -81,5 +81,15 @@ elif chart == "Line":
     st.plotly_chart(fig)
 
 elif chart == "Heatmap":
-    fig = px.imshow(df.corr(), title="Correlation Matrix")
+
+    # Select ONLY numeric columns
+    num_df = df.select_dtypes(include="number")
+
+    if num_df.shape[1] < 2:
+        st.warning("Not enough numeric columns for correlation heatmap")
+        st.stop()
+
+    corr = num_df.corr()
+
+    fig = px.imshow(corr, title="Correlation Matrix")
     st.plotly_chart(fig)
