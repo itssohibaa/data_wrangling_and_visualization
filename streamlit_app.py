@@ -10,7 +10,7 @@ if "intro_done" not in st.session_state:
     st.session_state.intro_done = False
 
 # ===============================
-# 🔹 FULLSCREEN + BACKGROUND STYLE
+# 🔹 FULLSCREEN + DATA-THEMED STYLE
 # ===============================
 st.markdown("""
 <style>
@@ -20,7 +20,7 @@ st.markdown("""
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+    background: radial-gradient(circle at 20% 20%, #1f4037, #0f2027, #000000);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -28,7 +28,26 @@ st.markdown("""
     z-index: 999999;
     text-align: center;
     color: white;
-    animation: fadeIn 1.5s ease-in-out;
+    animation: fadeIn 1.2s ease-in-out;
+}
+
+/* subtle glow effect */
+.title {
+    font-size: 60px;
+    font-weight: 700;
+    text-shadow: 0 0 15px rgba(0,255,200,0.6);
+}
+
+.subtitle {
+    font-size: 20px;
+    opacity: 0.85;
+    margin-top: 10px;
+}
+
+.footer {
+    margin-top: 30px;
+    font-size: 16px;
+    opacity: 0.7;
 }
 
 @keyframes fadeIn {
@@ -39,23 +58,27 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ===============================
-# 🔹 INTRO SCREEN (3s + ANIMATION)
+# 🔹 INTRO SCREEN (5s)
 # ===============================
 if not st.session_state.intro_done:
 
     st.markdown("""
     <div class="fullscreen">
-        <h1 style="font-size:60px;">Data Wrangler & Visualizer</h1>
-        <h3>Interactive Data Preparation Studio</h3>
-        <p style="opacity:0.8;">Preparing your workspace...</p>
+        <div class="title">📊 Welcome to Data Wrangler & Visualizer</div>
+        <div class="subtitle">Transforming raw data into meaningful insights</div>
+        <div class="subtitle">🚀 Initializing analytical environment...</div>
+        
+        <div class="footer">
+            Developed by:<br>
+            <b>00017592 & 00018555</b>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # 🎉 Animations
+    # 🎉 visual effect (not winter, more neutral celebration)
     st.balloons()
-    st.snow()   # subtle sparkle effect
 
-    time.sleep(3)
+    time.sleep(5)
 
     st.session_state.intro_done = True
     st.rerun()
