@@ -27,7 +27,7 @@ st.subheader("Dataset Preview")
 st.dataframe(df.head())
 
 # ===============================
-# 🔹 DATA SUMMARY (NEW)
+# 🔹 SUMMARY
 # ===============================
 st.subheader("📊 Dataset Summary")
 
@@ -43,54 +43,54 @@ st.write(summary)
 # ===============================
 # 🔹 FILE NAME
 # ===============================
-filename = st.text_input("File name (without extension)", "cleaned_data")
+filename = st.text_input("File name", "cleaned_data")
 
 # ===============================
-# 🔹 EXPORT FORMAT
+# 🔹 DOWNLOAD BUTTONS (NO SELECTBOX → more stable)
 # ===============================
 st.subheader("Download Dataset")
 
-format_choice = st.selectbox(
-    "Select format",
-    ["CSV", "Excel", "JSON"]
-)
+col1, col2, col3 = st.columns(3)
 
 # --- CSV ---
-if format_choice == "CSV":
+with col1:
     csv = df.to_csv(index=False).encode()
     st.download_button(
-        "Download CSV",
+        "⬇ CSV",
         csv,
         f"{filename}.csv",
         mime="text/csv"
     )
 
-# --- EXCEL ---
-elif format_choice == "Excel":
-    buffer = BytesIO()
-    with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-        df.to_excel(writer, index=False, sheet_name="Data")
+# --- EXCEL (FIXED) ---
+with col2:
+    try:
+        buffer = BytesIO()
+        with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False)
 
-    st.download_button(
-        "Download Excel",
-        buffer.getvalue(),
-        f"{filename}.xlsx",
-        mime="application/vnd.ms-excel"
-    )
+        st.download_button(
+            "⬇ Excel",
+            buffer.getvalue(),
+            f"{filename}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    except Exception as e:
+        st.warning("Excel export not available (missing dependency)")
 
 # --- JSON ---
-elif format_choice == "JSON":
+with col3:
     json_data = df.to_json(orient="records", indent=2)
 
     st.download_button(
-        "Download JSON",
+        "⬇ JSON",
         json_data,
         f"{filename}.json",
         mime="application/json"
     )
 
 # ===============================
-# 🔹 TRANSFORMATION REPORT
+# 🔹 REPORT
 # ===============================
 st.markdown("---")
 st.subheader("📝 Transformation Report")
@@ -101,13 +101,10 @@ report = {
     "steps": st.session_state.log
 }
 
-# Display nicely
-st.write("### Steps Applied")
-st.write(st.session_state.log if st.session_state.log else "No transformations applied")
+st.write(st.session_state.log if st.session_state.log else "No transformations yet")
 
-# Download report
 st.download_button(
-    "Download Report (JSON)",
+    "⬇ Download Report",
     json.dumps(report, indent=2),
     f"{filename}_report.json",
     mime="application/json"
