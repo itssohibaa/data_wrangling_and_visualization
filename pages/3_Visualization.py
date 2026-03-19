@@ -55,14 +55,8 @@ with col1:
     if numeric_cols:
         col = st.selectbox("Distribution column", numeric_cols, key="g1_col")
 
-        fig1 = px.histogram(
-            df, x=col,
-            title=f"Distribution of {col}"
-        )
-
+        fig1 = px.histogram(df, x=col, title=f"Distribution of {col}")
         st.plotly_chart(fig1, use_container_width=True, key="g1_chart")
-
-        st.caption("Shows distribution, skewness and possible outliers.")
 
 # -------------------------------
 # GRAPH 2: Category vs Numeric
@@ -74,14 +68,9 @@ with col2:
 
         grouped = df.groupby(cat)[num].mean().reset_index()
 
-        fig2 = px.bar(
-            grouped, x=cat, y=num,
-            title=f"Average {num} by {cat}"
-        )
-
+        fig2 = px.bar(grouped, x=cat, y=num,
+                      title=f"Average {num} by {cat}")
         st.plotly_chart(fig2, use_container_width=True, key="g2_chart")
-
-        st.caption("Compares average values across categories.")
 
 # -------------------------------
 # GRAPH 3: Scatter
@@ -91,14 +80,9 @@ with col3:
         x = st.selectbox("X-axis", numeric_cols, key="g3_x")
         y = st.selectbox("Y-axis", numeric_cols, key="g3_y")
 
-        fig3 = px.scatter(
-            df, x=x, y=y,
-            title=f"{y} vs {x}"
-        )
-
+        fig3 = px.scatter(df, x=x, y=y,
+                          title=f"{y} vs {x}")
         st.plotly_chart(fig3, use_container_width=True, key="g3_chart")
-
-        st.caption("Shows relationship between two variables.")
 
 # -------------------------------
 # GRAPH 4: Heatmap
@@ -112,10 +96,7 @@ with col4:
             color_continuous_scale="RdBu_r",
             title="Correlation Heatmap"
         )
-
         st.plotly_chart(fig4, use_container_width=True, key="g4_chart")
-
-        st.caption("Red = positive correlation, Blue = negative.")
 
 # ===============================
 # 🔹 CUSTOM BUILDER
@@ -129,14 +110,12 @@ analysis_type = st.selectbox(
     key="analysis_type"
 )
 
-# --- DISTRIBUTION ---
 if analysis_type == "Distribution" and numeric_cols:
     col = st.selectbox("Column", numeric_cols, key="custom_dist")
 
     fig = px.histogram(df, x=col, title=f"Distribution of {col}")
     st.plotly_chart(fig, use_container_width=True, key="custom_dist_chart")
 
-# --- RELATIONSHIP ---
 elif analysis_type == "Relationship" and len(numeric_cols) >= 2:
     x = st.selectbox("X", numeric_cols, key="custom_x")
     y = st.selectbox("Y", numeric_cols, key="custom_y")
@@ -144,7 +123,6 @@ elif analysis_type == "Relationship" and len(numeric_cols) >= 2:
     fig = px.scatter(df, x=x, y=y, title=f"{y} vs {x}")
     st.plotly_chart(fig, use_container_width=True, key="custom_scatter_chart")
 
-# --- COMPARISON ---
 elif analysis_type == "Comparison" and categorical_cols and numeric_cols:
     cat = st.selectbox("Category", categorical_cols, key="custom_cat")
     num = st.selectbox("Value", numeric_cols, key="custom_num")
@@ -154,7 +132,6 @@ elif analysis_type == "Comparison" and categorical_cols and numeric_cols:
     fig = px.bar(grouped, x=cat, y=num, title=f"{num} by {cat}")
     st.plotly_chart(fig, use_container_width=True, key="custom_bar_chart")
 
-# --- CORRELATION ---
 elif analysis_type == "Correlation" and len(numeric_cols) >= 2:
     fig = px.imshow(
         df[numeric_cols].corr(),
@@ -164,12 +141,50 @@ elif analysis_type == "Correlation" and len(numeric_cols) >= 2:
     st.plotly_chart(fig, use_container_width=True, key="custom_heatmap_chart")
 
 # ===============================
-# 🔹 AI INTERPRETATION (SAFE)
+# 🔹 SMART INTERPRETATION (REPLACED AI)
 # ===============================
 st.markdown("---")
-st.subheader("🤖 AI Insight (Optional)")
+st.subheader("📊 Smart Interpretation")
 
-question = st.text_input("Ask about your dataset")
+try:
+    if numeric_cols:
 
-if question:
-    st.info("AI feature requires API key setup (disabled for now).")
+        col = numeric_cols[0]
+
+        mean = df[col].mean()
+        median = df[col].median()
+        skew = df[col].skew()
+
+        interpretation = f"For '{col}': "
+
+        # Skewness
+        if skew > 1:
+            interpretation += "distribution is strongly right-skewed. "
+        elif skew < -1:
+            interpretation += "distribution is strongly left-skewed. "
+        else:
+            interpretation += "distribution is relatively symmetric. "
+
+        # Mean vs Median
+        if mean > median:
+            interpretation += "Mean is greater than median, indicating possible high-value outliers. "
+        elif mean < median:
+            interpretation += "Median is greater than mean, suggesting left skew. "
+
+        # Outliers check
+        Q1 = df[col].quantile(0.25)
+        Q3 = df[col].quantile(0.75)
+        IQR = Q3 - Q1
+
+        outliers = df[(df[col] < Q1 - 1.5 * IQR) |
+                      (df[col] > Q3 + 1.5 * IQR)]
+
+        interpretation += f"Detected approximately {len(outliers)} potential outliers."
+
+        st.write(interpretation)
+
+    else:
+        st.info("No numeric data available for interpretation")
+
+except Exception as e:
+    st.warning("Could not generate interpretation")
