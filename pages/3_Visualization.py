@@ -1,14 +1,15 @@
 import streamlit as st
 import plotly.express as px
 import pandas as pd
+import numpy as np
 
 # ===============================
-# 🔹 SESSION STATE
+# 🔹 SESSION
 # ===============================
 if "df" not in st.session_state:
     st.session_state.df = None
 
-st.title("📊 Advanced Visualization Builder")
+st.title("📊 Advanced Visualization Studio")
 
 if st.session_state.df is None:
     st.warning("Upload data first")
@@ -17,7 +18,7 @@ if st.session_state.df is None:
 df = st.session_state.df.copy()
 
 # ===============================
-# 🔥 FILTERS
+# 🔹 FILTERS
 # ===============================
 st.subheader("Filters")
 
@@ -29,183 +30,141 @@ selected_vals = st.multiselect("Select values", unique_vals)
 if selected_vals:
     df = df[df[filter_col].astype(str).isin(selected_vals)]
 
-# Safety check
 if df.empty:
-    st.warning("No data available after filtering")
+    st.warning("No data after filtering")
     st.stop()
 
 # ===============================
-# 🔥 PRE-BUILT INSIGHTS (DYNAMIC)
+# 🔹 COLUMN TYPES
 # ===============================
-st.subheader("📌 Key Insights from Dataset")
-
 categorical_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
-numeric_cols = df.select_dtypes(include="number").columns.tolist()
+numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
 
-insight = st.selectbox(
-    "Choose an insight",
-    [
-        "Most frequent category",
-        "Distribution of numeric variable",
-        "Top categories by numeric value",
-        "Correlation heatmap"
-    ]
-)
+# ===============================
+# 🔹 MULTI-GRAPH LAYOUT (2x2)
+# ===============================
+st.subheader("📈 Analytical Dashboard (4 Graphs)")
 
-# 1️⃣ MOST FREQUENT CATEGORY
-if insight == "Most frequent category":
+col1, col2 = st.columns(2)
+col3, col4 = st.columns(2)
 
-    if len(categorical_cols) == 0:
-        st.warning("No categorical columns available")
-    else:
-        col = st.selectbox("Select column", categorical_cols)
+# -------------------------------
+# GRAPH 1: Distribution
+# -------------------------------
+with col1:
+    if numeric_cols:
+        col = st.selectbox("Distribution column", numeric_cols, key="g1")
+        fig = px.histogram(df, x=col, title=f"Distribution of {col}")
+        st.plotly_chart(fig, use_container_width=True)
 
-        counts = df[col].value_counts().reset_index()
-        counts.columns = [col, "Count"]
+        st.caption(f"This chart shows how values of '{col}' are distributed. Helps detect skewness and outliers.")
 
-        fig = px.bar(counts, x=col, y="Count",
-                     title=f"Most Frequent Values in {col}")
-        st.plotly_chart(fig)
-
-# 2️⃣ NUMERIC DISTRIBUTION
-elif insight == "Distribution of numeric variable":
-
-    if len(numeric_cols) == 0:
-        st.warning("No numeric columns available")
-    else:
-        col = st.selectbox("Select column", numeric_cols)
-
-        fig = px.histogram(df, x=col,
-                           title=f"Distribution of {col}")
-        st.plotly_chart(fig)
-
-# 3️⃣ TOP CATEGORY VS NUMERIC
-elif insight == "Top categories by numeric value":
-
-    if len(categorical_cols) == 0 or len(numeric_cols) == 0:
-        st.warning("Need both categorical and numeric columns")
-    else:
-        cat = st.selectbox("Category", categorical_cols)
-        num = st.selectbox("Numeric value", numeric_cols)
+# -------------------------------
+# GRAPH 2: Category vs Numeric
+# -------------------------------
+with col2:
+    if categorical_cols and numeric_cols:
+        cat = st.selectbox("Category", categorical_cols, key="g2_cat")
+        num = st.selectbox("Value", numeric_cols, key="g2_num")
 
         grouped = df.groupby(cat)[num].mean().reset_index()
 
         fig = px.bar(grouped, x=cat, y=num,
-                     title=f"{num} by {cat}")
-        st.plotly_chart(fig)
+                     title=f"Average {num} by {cat}")
+        st.plotly_chart(fig, use_container_width=True)
 
-# 4️⃣ HEATMAP
-elif insight == "Correlation heatmap":
+        st.caption(f"Compares how '{num}' differs across categories of '{cat}'.")
 
-    if len(numeric_cols) < 2:
-        st.warning("Not enough numeric columns for heatmap")
-    else:
+# -------------------------------
+# GRAPH 3: Scatter (Relationship)
+# -------------------------------
+with col3:
+    if len(numeric_cols) >= 2:
+        x = st.selectbox("X", numeric_cols, key="g3_x")
+        y = st.selectbox("Y", numeric_cols, key="g3_y")
+
+        fig = px.scatter(df, x=x, y=y,
+                         title=f"Relationship between {x} and {y}")
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.caption(f"Shows correlation or relationship between '{x}' and '{y}'.")
+
+# -------------------------------
+# GRAPH 4: Heatmap
+# -------------------------------
+with col4:
+    if len(numeric_cols) >= 2:
         corr = df[numeric_cols].corr()
 
-        fig = px.imshow(corr, title="Correlation Matrix")
-        st.plotly_chart(fig)
+        fig = px.imshow(
+            corr,
+            color_continuous_scale="RdBu_r",
+            title="Correlation Heatmap"
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.caption("Red = strong positive correlation, Blue = negative correlation.")
 
 # ===============================
-# 🔧 CUSTOM BUILDER
+# 🔹 CUSTOM BUILDER
 # ===============================
 st.markdown("---")
 st.subheader("🔧 Custom Visualization Builder")
 
 chart = st.selectbox(
-    "Chart Type",
-    ["Histogram", "Scatter", "Box", "Line", "Bar", "Heatmap"]
+    "What do you want to analyze?",
+    ["Distribution", "Relationship", "Comparison", "Correlation"]
 )
 
-agg = st.selectbox("Aggregation", ["None", "Mean", "Sum", "Count"])
-
-# --- BAR ---
-if chart == "Bar":
-
-    if len(categorical_cols) == 0 or len(numeric_cols) == 0:
-        st.warning("Need categorical and numeric columns")
-        st.stop()
-
-    x = st.selectbox("Category", categorical_cols)
-    y = st.selectbox("Value", numeric_cols)
-
-    top_n = st.slider("Top N", 5, 50, 10)
-
-    grouped = df.groupby(x)[y]
-
-    if agg == "Mean":
-        grouped = grouped.mean()
-    elif agg == "Sum":
-        grouped = grouped.sum()
-    elif agg == "Count":
-        grouped = grouped.count()
-    else:
-        grouped = grouped.mean()
-
-    grouped = grouped.nlargest(top_n).reset_index()
-
-    fig = px.bar(grouped, x=x, y=y, title=f"{y} by {x}")
+if chart == "Distribution" and numeric_cols:
+    col = st.selectbox("Column", numeric_cols)
+    fig = px.histogram(df, x=col, title=f"Distribution of {col}")
     st.plotly_chart(fig)
 
-# --- SCATTER ---
-elif chart == "Scatter":
-
-    if len(numeric_cols) < 2:
-        st.warning("Need at least 2 numeric columns")
-        st.stop()
-
+elif chart == "Relationship" and len(numeric_cols) >= 2:
     x = st.selectbox("X", numeric_cols)
     y = st.selectbox("Y", numeric_cols)
-    color = st.selectbox("Color (optional)", [None] + list(df.columns))
-
-    fig = px.scatter(df, x=x, y=y, color=color,
-                     title=f"{y} vs {x}")
+    fig = px.scatter(df, x=x, y=y)
     st.plotly_chart(fig)
 
-# --- HISTOGRAM ---
-elif chart == "Histogram":
-
-    col = st.selectbox("Column", df.columns)
-
-    fig = px.histogram(df, x=col,
-                       title=f"{col} Distribution")
+elif chart == "Comparison" and categorical_cols and numeric_cols:
+    cat = st.selectbox("Category", categorical_cols)
+    num = st.selectbox("Value", numeric_cols)
+    grouped = df.groupby(cat)[num].mean().reset_index()
+    fig = px.bar(grouped, x=cat, y=num)
     st.plotly_chart(fig)
 
-# --- BOX ---
-elif chart == "Box":
-
-    if len(numeric_cols) == 0:
-        st.warning("No numeric columns available")
-        st.stop()
-
-    col = st.selectbox("Column", numeric_cols)
-
-    fig = px.box(df, y=col,
-                 title=f"{col} Boxplot")
+elif chart == "Correlation" and len(numeric_cols) >= 2:
+    fig = px.imshow(df[numeric_cols].corr(),
+                    color_continuous_scale="RdBu_r")
     st.plotly_chart(fig)
 
-# --- LINE ---
-elif chart == "Line":
+# ===============================
+# 🔹 AI INTERPRETATION (OPTIONAL)
+# ===============================
+st.markdown("---")
+st.subheader("🤖 AI Insight Assistant")
 
-    if len(numeric_cols) == 0:
-        st.warning("No numeric columns available")
-        st.stop()
+user_question = st.text_input("Ask about your data")
 
-    x = st.selectbox("X", df.columns)
-    y = st.selectbox("Y", numeric_cols)
+if user_question:
+    try:
+        import openai
 
-    fig = px.line(df, x=x, y=y,
-                  title=f"{y} over {x}")
-    st.plotly_chart(fig)
+        openai.api_key = st.secrets.get("OPENAI_API_KEY", "")
 
-# --- HEATMAP ---
-elif chart == "Heatmap":
+        sample = df.head(20).to_string()
 
-    if len(numeric_cols) < 2:
-        st.warning("Not enough numeric columns for correlation heatmap")
-        st.stop()
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a data analyst."},
+                {"role": "user", "content": f"Dataset:\n{sample}\n\nQuestion: {user_question}"}
+            ]
+        )
 
-    corr = df[numeric_cols].corr()
+        st.write(response["choices"][0]["message"]["content"])
 
-    fig = px.imshow(corr,
-                    title="Correlation Matrix")
-    st.plotly_chart(fig)
+    except Exception:
+        st.warning("AI not configured (API key missing)")
