@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np   # ← KEPT (even if not used)
 
 # --- SESSION INIT ---
 if "df" not in st.session_state:
@@ -27,10 +28,11 @@ if file is not None:
             st.error("Unsupported file type")
             st.stop()
 
+        # SAVE TO SESSION
         st.session_state.df = df
         st.success("✅ File uploaded successfully!")
 
-        # ✅ LOGGING ADDED
+        # ✅ LOGGING (ADDED ONLY)
         st.session_state.log.append("Dataset uploaded")
 
     except Exception as e:
@@ -60,7 +62,9 @@ if st.session_state.df is not None:
 
     # RESET BUTTON
     if st.button("Reset Session"):
-        st.session_state.log.append("Session reset")  # ✅ LOGGING
+        # ✅ LOGGING (ADDED ONLY)
+        st.session_state.log.append("Session reset")
+
         st.session_state.df = None
         st.session_state.log = []
         st.rerun()
