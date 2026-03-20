@@ -190,7 +190,7 @@ except Exception:
     st.warning("Could not generate interpretation")
 
 # ===============================
-# 🔹 MATPLOTLIB (NOW INTERACTIVE)
+# 🔹 MATPLOTLIB (FIXED)
 # ===============================
 st.markdown("---")
 st.subheader("📉 Matplotlib Chart (Interactive)")
@@ -198,9 +198,19 @@ st.subheader("📉 Matplotlib Chart (Interactive)")
 if numeric_cols:
     col_m = st.selectbox("Column for matplotlib chart", numeric_cols, key="mpl_col")
 
-    fig, ax = plt.subplots()
-    ax.hist(df[col_m])
-    ax.set_title(f"Matplotlib Histogram of {col_m}")
+    # 🔴 CLEAN DATA (prevents empty output)
+    clean_data = df[col_m].dropna()
 
-    html_fig = mpld3.fig_to_html(fig)
-    html(html_fig, height=500)
+    if clean_data.empty:
+        st.warning("No valid data to plot")
+    else:
+        fig, ax = plt.subplots()
+        ax.hist(clean_data)
+        ax.set_title(f"Matplotlib Histogram of {col_m}")
+
+        try:
+            html_fig = mpld3.fig_to_html(fig)
+            html(html_fig, height=500)
+        except Exception:
+            st.warning("Interactive mode failed — showing static chart")
+            st.pyplot(fig)
