@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import io
 
+
 if "df" not in st.session_state:
     st.session_state.df = None
 
@@ -56,23 +57,30 @@ def style_fig(fig, title="", xlab="", ylab=""):
     return fig
 
 def chart_download(fig, key):
-    c1, c2 = st.columns(2)
-    with c1:
-        try:
-            img_bytes = fig.to_image(format="png", width=1400, height=700, scale=2)
-            st.download_button("⬇️ PNG", img_bytes,
-                               file_name=f"chart_{key}.png", mime="image/png",
-                               key=f"dl_png_{key}")
-        except Exception:
-            st.caption("PNG unavailable")
-    with c2:
-        try:
-            svg_bytes = fig.to_image(format="svg", width=1400, height=700)
-            st.download_button("⬇️ SVG", svg_bytes,
-                               file_name=f"chart_{key}.svg", mime="image/svg+xml",
-                               key=f"dl_svg_{key}")
-        except Exception:
-            st.caption("SVG unavailable")
+    # Apply white background for clean export
+    export_fig = go.Figure(fig)
+    export_fig.update_layout(
+        paper_bgcolor="white",
+        plot_bgcolor="#f8fafc",
+        font_color="#0f172a",
+        title_font_color="#0f172a",
+    )
+    html_str = export_fig.to_html(
+        include_plotlyjs="cdn",
+        full_html=True,
+        config={"toImageButtonOptions": {
+            "format": "png", "filename": f"chart_{key}",
+            "height": 700, "width": 1400, "scale": 2
+        }}
+    )
+    st.download_button(
+        "⬇️ Download chart (PNG via browser)",
+        html_str.encode(),
+        file_name=f"chart_{key}.html",
+        mime="text/html",
+        key=f"dl_{key}",
+        help="Opens in browser — use the 📷 camera icon (top right of chart) to save as PNG"
+    )
 
 # ── FILTERS ───────────────────────────────────────────────────────────────────
 with st.expander("🔎 Filters", expanded=False):
