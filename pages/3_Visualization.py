@@ -54,19 +54,22 @@ def chart_download(fig, key):
     c1, c2 = st.columns(2)
     with c1:
         try:
-            img_bytes = fig.to_image(format="png", width=1200, height=600, scale=2)
+            img_bytes = fig.to_image(format="png", width=1400, height=700, scale=3)
             st.download_button(
-                "⬇️ PNG", img_bytes,
+                "⬇️ Download PNG", img_bytes,
                 file_name=f"chart_{key}.png", mime="image/png", key=f"dl_png_{key}"
             )
         except Exception:
-            st.caption("PNG unavailable")
+            st.caption("PNG unavailable — check kaleido")
     with c2:
-        html_str = fig.to_html(include_plotlyjs="cdn", full_html=True)
-        st.download_button(
-            "⬇️ HTML (interactive)", html_str.encode(),
-            file_name=f"chart_{key}.html", mime="text/html", key=f"dl_html_{key}"
-        )
+        try:
+            svg_bytes = fig.to_image(format="svg", width=1400, height=700)
+            st.download_button(
+                "⬇️ Download SVG", svg_bytes,
+                file_name=f"chart_{key}.svg", mime="image/svg+xml", key=f"dl_svg_{key}"
+            )
+        except Exception:
+            st.caption("SVG unavailable")
 
 # ── FILTERS ───────────────────────────────────────────────────────────────────
 with st.expander("🔎 Filters", expanded=False):
