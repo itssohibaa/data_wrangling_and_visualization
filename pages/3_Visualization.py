@@ -4,7 +4,6 @@ import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib
 import io
 
 if "df" not in st.session_state:
@@ -15,12 +14,19 @@ st.title("📊 Visualization Studio")
 if st.session_state.df is None:
     st.warning("Upload data first on the Upload page."); st.stop()
 
-df = st.session_state.df.copy()
-# Deduplicate column names
-cols = pd.Series(df.columns)
-for dup in cols[cols.duplicated()].unique():
-    cols[cols == dup] = [f"{dup}_{i}" if i != 0 else dup for i, _ in enumerate(cols[cols == dup])]
-df.columns = cols
+# ── DEDUPLICATE COLUMNS (fixes line chart + all charts) ───────────────────────
+raw = st.session_state.df.copy()
+seen = {}
+new_cols = []
+for col in raw.columns:
+    if col in seen:
+        seen[col] += 1
+        new_cols.append(f"{col}_{seen[col]}")
+    else:
+        seen[col] = 0
+        new_cols.append(col)
+raw.columns = new_cols
+df = raw
 
 categorical_cols = df.select_dtypes(include=["object","category"]).columns.tolist()
 numeric_cols     = df.select_dtypes(include=np.number).columns.tolist()
@@ -39,7 +45,6 @@ LAYOUT_BASE = dict(
 )
 
 def style_fig(fig, title="", xlab="", ylab=""):
-    """Apply consistent styling + axis labels to any figure."""
     fig.update_layout(
         **LAYOUT_BASE,
         title=dict(text=title, x=0.02, xanchor="left"),
@@ -54,20 +59,18 @@ def chart_download(fig, key):
     c1, c2 = st.columns(2)
     with c1:
         try:
-            img_bytes = fig.to_image(format="png", width=1400, height=700, scale=3)
-            st.download_button(
-                "⬇️ Download PNG", img_bytes,
-                file_name=f"chart_{key}.png", mime="image/png", key=f"dl_png_{key}"
-            )
+            img_bytes = fig.to_image(format="png", width=1400, height=700, scale=2)
+            st.download_button("⬇️ PNG", img_bytes,
+                               file_name=f"chart_{key}.png", mime="image/png",
+                               key=f"dl_png_{key}")
         except Exception:
-            st.caption("PNG unavailable — check kaleido")
+            st.caption("PNG unavailable")
     with c2:
         try:
             svg_bytes = fig.to_image(format="svg", width=1400, height=700)
-            st.download_button(
-                "⬇️ Download SVG", svg_bytes,
-                file_name=f"chart_{key}.svg", mime="image/svg+xml", key=f"dl_svg_{key}"
-            )
+            st.download_button("⬇️ SVG", svg_bytes,
+                               file_name=f"chart_{key}.svg", mime="image/svg+xml",
+                               key=f"dl_svg_{key}")
         except Exception:
             st.caption("SVG unavailable")
 
@@ -95,7 +98,7 @@ st.caption(f"Working with {len(df):,} rows after filtering.")
 st.markdown("---")
 
 # ════════════════════════════════════════════════════════════════════════════════
-# ANALYTICAL DASHBOARD — 6 charts in 3×2 grid
+# ANALYTICAL DASHBOARD
 # ════════════════════════════════════════════════════════════════════════════════
 st.subheader("📈 Analytical Dashboard")
 
@@ -103,40 +106,38 @@ r1c1, r1c2 = st.columns(2, gap="medium")
 r2c1, r2c2 = st.columns(2, gap="medium")
 r3c1, r3c2 = st.columns(2, gap="medium")
 
-# Chart 1 — Histogram
 with r1c1:
     with st.container(border=True):
         st.markdown("**Distribution (Histogram)**")
         if numeric_cols:
             g1c = st.selectbox("Column", numeric_cols, key="g1c")
             g1b = st.slider("Bins", 5, 80, 20, key="g1b")
-            fig = px.histogram(df, x=g1c, nbins=g1b, color_discrete_sequence=[THEME_COLORS[0]],
+            fig = px.histogram(df, x=g1c, nbins=g1b,
+                               color_discrete_sequence=[THEME_COLORS[0]],
                                labels={g1c: g1c, "count": "Frequency"})
             fig = style_fig(fig, f"Distribution of {g1c}", g1c, "Frequency")
-            st.plotly_chart(fig, use_container_width=True, key="g1")
+            st.plotly_chart(fig, key="g1")
             chart_download(fig, "g1")
 
-# Chart 2 — Bar
 with r1c2:
     with st.container(border=True):
         st.markdown("**Comparison (Bar Chart)**")
         if categorical_cols and numeric_cols:
             g2cat = st.selectbox("Category", categorical_cols, key="g2cat")
             g2num = st.selectbox("Value", numeric_cols, key="g2num")
-            g2n   = st.slider("Top N", 3, 30, 10, key="g2n",
-                              help="Show only the top N categories by average value")
+            g2n   = st.slider("Top N", 3, 30, 10, key="g2n")
             g2agg = st.selectbox("Aggregation", ["mean","sum","count","median"], key="g2agg")
             gd    = df.groupby(g2cat)[g2num].agg(g2agg).reset_index().nlargest(g2n, g2num)
             fig   = px.bar(gd, x=g2cat, y=g2num, color=g2cat,
                            color_discrete_sequence=THEME_COLORS,
-                           labels={g2cat: g2cat.replace("_"," "), g2num: g2num.replace("_"," ")})
+                           labels={g2cat: g2cat.replace("_"," "),
+                                   g2num: g2num.replace("_"," ")})
             fig = style_fig(fig, f"{g2agg.capitalize()} of {g2num} by {g2cat} (Top {g2n})",
                             g2cat.replace("_"," "), f"{g2agg.capitalize()} of {g2num}")
             fig.update_layout(showlegend=False)
-            st.plotly_chart(fig, use_container_width=True, key="g2")
+            st.plotly_chart(fig, key="g2")
             chart_download(fig, "g2")
 
-# Chart 3 — Scatter
 with r2c1:
     with st.container(border=True):
         st.markdown("**Relationship (Scatter)**")
@@ -147,13 +148,11 @@ with r2c1:
             ca    = g3col if g3col != "(none)" else None
             fig   = px.scatter(df, x=g3x, y=g3y, color=ca,
                                color_discrete_sequence=THEME_COLORS,
-                               trendline="ols" if not ca else None,
                                labels={g3x: g3x.replace("_"," "), g3y: g3y.replace("_"," ")})
             fig = style_fig(fig, f"{g3y} vs {g3x}", g3x.replace("_"," "), g3y.replace("_"," "))
-            st.plotly_chart(fig, use_container_width=True, key="g3")
+            st.plotly_chart(fig, key="g3")
             chart_download(fig, "g3")
 
-# Chart 4 — Heatmap
 with r2c2:
     with st.container(border=True):
         st.markdown("**Correlation Heatmap**")
@@ -163,29 +162,26 @@ with r2c2:
                              labels=dict(color="Correlation"))
             fig = style_fig(fig, "Correlation Matrix")
             fig.update_layout(xaxis_title="", yaxis_title="")
-            st.plotly_chart(fig, use_container_width=True, key="g4")
+            st.plotly_chart(fig, key="g4")
             chart_download(fig, "g4")
 
-# Chart 5 — Box
 with r3c1:
     with st.container(border=True):
         st.markdown("**Distribution (Box Plot)**")
         if numeric_cols:
-            g5y   = st.selectbox("Value (Y-axis)", numeric_cols, key="g5y")
-            g5x   = st.selectbox("Group by (X-axis)", ["(none)"] + categorical_cols, key="g5x")
-            xa    = g5x if g5x != "(none)" else None
-            fig   = px.box(df, x=xa, y=g5y, color=xa,
-                           color_discrete_sequence=THEME_COLORS,
-                           labels={g5y: g5y.replace("_"," ")})
+            g5y = st.selectbox("Value (Y-axis)", numeric_cols, key="g5y")
+            g5x = st.selectbox("Group by (X-axis)", ["(none)"] + categorical_cols, key="g5x")
+            xa  = g5x if g5x != "(none)" else None
+            fig = px.box(df, x=xa, y=g5y, color=xa,
+                         color_discrete_sequence=THEME_COLORS,
+                         labels={g5y: g5y.replace("_"," ")})
             xtitle = g5x.replace("_"," ") if xa else ""
             fig = style_fig(fig, f"Box Plot of {g5y}" + (f" by {g5x}" if xa else ""),
                             xtitle, g5y.replace("_"," "))
             fig.update_layout(showlegend=False)
-            st.plotly_chart(fig, use_container_width=True, key="g5")
+            st.plotly_chart(fig, key="g5")
             chart_download(fig, "g5")
 
-# Chart 6 — Line
-# Chart 6 — Line
 with r3c2:
     with st.container(border=True):
         st.markdown("**Trend (Line Chart)**")
@@ -196,41 +192,30 @@ with r3c2:
             ca6   = g6col if g6col != "(none)" else None
             try:
                 cols_needed = [g6x, g6y] + ([g6col] if ca6 else [])
-                pld = df[cols_needed].copy()
-                pld.columns = [f"col_{i}" for i in range(len(pld.columns))]
-                xcol, ycol = "col_0", "col_1"
-                ccol = "col_2" if ca6 else None
-                pld = pld.dropna().sort_values(xcol)
-                fig = px.line(pld, x=xcol, y=ycol, color=ccol,
-                              color_discrete_sequence=THEME_COLORS)
-                fig = style_fig(fig, f"{g6y} over {g6x}",
-                                g6x.replace("_"," "), g6y.replace("_"," "))
-                st.plotly_chart(fig, use_container_width=True, key="g6")
+                pld = df[cols_needed].dropna().reset_index(drop=True)
+                pld = pld.sort_values(pld.columns[0])
+                fig = px.line(pld, x=g6x, y=g6y, color=ca6,
+                              color_discrete_sequence=THEME_COLORS,
+                              labels={g6x: g6x.replace("_"," "), g6y: g6y.replace("_"," ")})
+                fig = style_fig(fig, f"{g6y} over {g6x}", g6x.replace("_"," "), g6y.replace("_"," "))
+                st.plotly_chart(fig, key="g6")
                 chart_download(fig, "g6")
             except Exception as e:
                 st.warning(f"Could not render line chart: {e}")
 
+st.markdown("---")
+
 # ════════════════════════════════════════════════════════════════════════════════
-# CUSTOM CHART BUILDER — 8 chart types incl. 3D
+# CUSTOM CHART BUILDER
 # ════════════════════════════════════════════════════════════════════════════════
 st.subheader("🔧 Custom Chart Builder")
 
-CHART_TYPES = [
-    "Histogram",
-    "Bar Chart",
-    "Scatter Plot",
-    "Line Chart",
-    "Box Plot",
-    "Correlation Heatmap",
-    "3D Scatter Plot",
-    "Pie / Donut Chart"
-]
+CHART_TYPES = ["Histogram", "Bar Chart", "Scatter Plot", "Line Chart",
+               "Box Plot", "Correlation Heatmap", "3D Scatter Plot", "Pie / Donut Chart"]
 
 chart_type = st.selectbox("Chart type", CHART_TYPES, key="ctype")
 fig = None
-xlab = ylab = title = ""
 
-# ── HISTOGRAM ─────────────────────────────────────────────────────────────────
 if chart_type == "Histogram":
     if not numeric_cols: st.warning("No numeric columns."); st.stop()
     c1, c2, c3 = st.columns(3)
@@ -243,7 +228,6 @@ if chart_type == "Histogram":
                          labels={col: col.replace("_"," "), "count": "Frequency"})
     fig = style_fig(fig, f"Distribution of {col}", col.replace("_"," "), "Frequency")
 
-# ── BAR ───────────────────────────────────────────────────────────────────────
 elif chart_type == "Bar Chart":
     if not (categorical_cols and numeric_cols):
         st.warning("Need categorical + numeric columns."); st.stop()
@@ -251,16 +235,15 @@ elif chart_type == "Bar Chart":
     cat  = c1.selectbox("X-axis (category)", categorical_cols, key="b_cat")
     num  = c2.selectbox("Y-axis (value)", numeric_cols, key="b_num")
     agg  = c3.selectbox("Aggregation", ["mean","sum","count","median"], key="b_agg")
-    topn = c4.slider("Top N categories", 3, 50, 15, key="b_topn",
-                     help="Show only the top N categories by aggregated value")
+    topn = c4.slider("Top N categories", 3, 50, 15, key="b_topn")
     gd   = df.groupby(cat)[num].agg(agg).reset_index().nlargest(topn, num)
     fig  = px.bar(gd, x=cat, y=num, color=cat, color_discrete_sequence=THEME_COLORS,
-                  labels={cat: cat.replace("_"," "), num: f"{agg} of {num.replace('_',' ')}"})
+                  labels={cat: cat.replace("_"," "),
+                          num: f"{agg} of {num.replace('_',' ')}"})
     fig = style_fig(fig, f"{agg.capitalize()} of {num} by {cat} (Top {topn})",
                     cat.replace("_"," "), f"{agg.capitalize()} of {num.replace('_',' ')}")
     fig.update_layout(showlegend=False)
 
-# ── SCATTER ───────────────────────────────────────────────────────────────────
 elif chart_type == "Scatter Plot":
     if len(numeric_cols) < 2: st.warning("Need ≥2 numeric columns."); st.stop()
     c1, c2, c3, c4 = st.columns(4)
@@ -274,7 +257,6 @@ elif chart_type == "Scatter Plot":
                        labels={xc: xc.replace("_"," "), yc: yc.replace("_"," ")})
     fig = style_fig(fig, f"Relationship: {yc} vs {xc}", xc.replace("_"," "), yc.replace("_"," "))
 
-# ── LINE ──────────────────────────────────────────────────────────────────────
 elif chart_type == "Line Chart":
     if not numeric_cols: st.warning("No numeric columns."); st.stop()
     c1, c2, c3 = st.columns(3)
@@ -282,13 +264,15 @@ elif chart_type == "Line Chart":
     yc    = c2.selectbox("Y-axis", numeric_cols, key="ln_y")
     colby = c3.selectbox("Color by", ["(none)"] + categorical_cols, key="ln_col")
     ca    = colby if colby != "(none)" else None
-    pld   = df[[xc, yc] + ([colby] if ca else [])].dropna().sort_values(xc)
-    fig   = px.line(pld, x=xc, y=yc, color=ca, color_discrete_sequence=THEME_COLORS,
-                    labels={xc: xc.replace("_"," "), yc: yc.replace("_"," ")},
-                    markers=True)
-    fig = style_fig(fig, f"{yc} over {xc}", xc.replace("_"," "), yc.replace("_"," "))
+    try:
+        cols_needed = [xc, yc] + ([colby] if ca else [])
+        pld = df[cols_needed].dropna().reset_index(drop=True).sort_values(xc)
+        fig = px.line(pld, x=xc, y=yc, color=ca, color_discrete_sequence=THEME_COLORS,
+                      labels={xc: xc.replace("_"," "), yc: yc.replace("_"," ")}, markers=True)
+        fig = style_fig(fig, f"{yc} over {xc}", xc.replace("_"," "), yc.replace("_"," "))
+    except Exception as e:
+        st.warning(f"Could not render line chart: {e}")
 
-# ── BOX ───────────────────────────────────────────────────────────────────────
 elif chart_type == "Box Plot":
     if not numeric_cols: st.warning("No numeric columns."); st.stop()
     c1, c2 = st.columns(2)
@@ -296,27 +280,23 @@ elif chart_type == "Box Plot":
     xc  = c2.selectbox("X-axis / group by", ["(none)"] + categorical_cols, key="bx_x")
     xa  = xc if xc != "(none)" else None
     fig = px.box(df, x=xa, y=yc, color=xa, color_discrete_sequence=THEME_COLORS,
-                 points="outliers",
-                 labels={yc: yc.replace("_"," ")})
+                 points="outliers", labels={yc: yc.replace("_"," ")})
     xtitle = xc.replace("_"," ") if xa else ""
     fig = style_fig(fig, f"Box Plot of {yc}" + (f" grouped by {xc}" if xa else ""),
                     xtitle, yc.replace("_"," "))
     fig.update_layout(showlegend=False)
 
-# ── HEATMAP ───────────────────────────────────────────────────────────────────
 elif chart_type == "Correlation Heatmap":
     if len(numeric_cols) < 2: st.warning("Need ≥2 numeric columns."); st.stop()
     sel_cols = st.multiselect("Columns to include", numeric_cols,
                                default=numeric_cols[:min(10,len(numeric_cols))], key="hm_cols")
-    if len(sel_cols) < 2: st.warning("Select at least 2 columns.")
-    else:
+    if len(sel_cols) >= 2:
         corr = df[sel_cols].corr()
         fig  = px.imshow(corr, color_continuous_scale="RdBu_r", text_auto=".2f",
                          aspect="auto", labels=dict(color="Correlation"))
         fig = style_fig(fig, "Correlation Matrix")
         fig.update_layout(xaxis_title="", yaxis_title="")
 
-# ── 3D SCATTER ────────────────────────────────────────────────────────────────
 elif chart_type == "3D Scatter Plot":
     if len(numeric_cols) < 3: st.warning("Need ≥3 numeric columns for 3D."); st.stop()
     c1, c2, c3, c4 = st.columns(4)
@@ -326,31 +306,26 @@ elif chart_type == "3D Scatter Plot":
     colby = c4.selectbox("Color by", ["(none)"] + categorical_cols + numeric_cols, key="3d_col")
     ca    = colby if colby != "(none)" else None
     fig   = px.scatter_3d(df.dropna(subset=[xc,yc,zc]), x=xc, y=yc, z=zc, color=ca,
-                          color_discrete_sequence=THEME_COLORS,
+                          color_discrete_sequence=THEME_COLORS, opacity=0.75,
                           labels={xc: xc.replace("_"," "),
                                   yc: yc.replace("_"," "),
-                                  zc: zc.replace("_"," ")},
-                          opacity=0.75)
+                                  zc: zc.replace("_"," ")})
     fig.update_layout(
         title=dict(text=f"3D Scatter: {xc} × {yc} × {zc}", x=0.02),
         font_family="Inter, sans-serif",
         paper_bgcolor="rgba(0,0,0,0)",
-        scene=dict(
-            xaxis_title=xc.replace("_"," "),
-            yaxis_title=yc.replace("_"," "),
-            zaxis_title=zc.replace("_"," "),
-            bgcolor="rgba(248,250,252,1)"
-        )
+        scene=dict(xaxis_title=xc.replace("_"," "),
+                   yaxis_title=yc.replace("_"," "),
+                   zaxis_title=zc.replace("_"," "),
+                   bgcolor="rgba(248,250,252,1)")
     )
 
-# ── PIE / DONUT ───────────────────────────────────────────────────────────────
 elif chart_type == "Pie / Donut Chart":
     if not categorical_cols: st.warning("No categorical columns."); st.stop()
     c1, c2, c3 = st.columns(3)
-    cat    = c1.selectbox("Category", categorical_cols, key="pi_cat")
-    topn   = c2.slider("Top N slices", 3, 20, 8, key="pi_topn",
-                       help="Group smaller slices into 'Other'")
-    donut  = c3.checkbox("Donut style", value=True, key="pi_donut")
+    cat   = c1.selectbox("Category", categorical_cols, key="pi_cat")
+    topn  = c2.slider("Top N slices", 3, 20, 8, key="pi_topn")
+    donut = c3.checkbox("Donut style", value=True, key="pi_donut")
     counts = df[cat].value_counts().reset_index()
     counts.columns = [cat, "count"]
     top   = counts.head(topn)
@@ -359,20 +334,15 @@ elif chart_type == "Pie / Donut Chart":
         top = pd.concat([top, pd.DataFrame([{cat: "Other", "count": other["count"].sum()}])],
                         ignore_index=True)
     fig = px.pie(top, names=cat, values="count",
-                 color_discrete_sequence=THEME_COLORS,
-                 hole=0.4 if donut else 0)
+                 color_discrete_sequence=THEME_COLORS, hole=0.4 if donut else 0)
     fig.update_traces(textposition="outside", textinfo="percent+label")
-    fig.update_layout(
-        title=dict(text=f"Distribution of {cat}", x=0.02),
-        font_family="Inter, sans-serif",
-        paper_bgcolor="rgba(0,0,0,0)",
-        legend_title=cat.replace("_"," ")
-    )
+    fig.update_layout(title=dict(text=f"Distribution of {cat}", x=0.02),
+                      font_family="Inter, sans-serif",
+                      paper_bgcolor="rgba(0,0,0,0)",
+                      legend_title=cat.replace("_"," "))
 
-# ── RENDER + DOWNLOAD ─────────────────────────────────────────────────────────
 if fig is not None:
-    st.plotly_chart(fig, use_container_width=True, key="custom_chart")
-    st.markdown("")
+    st.plotly_chart(fig, key="custom_chart")
     chart_download(fig, "custom")
 
 st.markdown("---")
@@ -391,18 +361,19 @@ if numeric_cols:
         if   skew > 1:  parts.append("Strongly **right-skewed** (long tail on the right). ")
         elif skew < -1: parts.append("Strongly **left-skewed** (long tail on the left). ")
         else:           parts.append("Roughly **symmetric** distribution. ")
-        if   s.mean() > s.median(): parts.append("Mean > Median — high-value outliers may be pulling the average up. ")
-        elif s.mean() < s.median(): parts.append("Median > Mean — low-value outliers may be pulling the average down. ")
+        if   s.mean() > s.median(): parts.append("Mean > Median — possible high-value outliers. ")
+        elif s.mean() < s.median(): parts.append("Median > Mean — possible low-value outliers. ")
         parts.append(f"Detected **{n_out} potential outliers** using IQR method.")
         st.info("".join(parts))
 
 st.markdown("---")
 
 # ── MATPLOTLIB CHART ──────────────────────────────────────────────────────────
-st.subheader("📉 Matplotlib Chart (Static)")
+st.subheader("📉 Matplotlib Chart")
 if numeric_cols:
-    mpl_col = st.selectbox("Column", numeric_cols, key="mpl_col")
-    mpl_type = st.radio("Chart type", ["Histogram", "KDE (density)"], horizontal=True, key="mpl_type")
+    mpl_col  = st.selectbox("Column", numeric_cols, key="mpl_col")
+    mpl_type = st.radio("Chart type", ["Histogram", "KDE (density)"],
+                        horizontal=True, key="mpl_type")
     clean_data = df[mpl_col].dropna()
     if not clean_data.empty:
         fig_mpl, ax = plt.subplots(figsize=(10, 4))
@@ -419,9 +390,8 @@ if numeric_cols:
         ax.set_facecolor("#f8fafc")
         fig_mpl.patch.set_facecolor("white")
         st.pyplot(fig_mpl)
-
         buf = io.BytesIO()
         fig_mpl.savefig(buf, format="png", dpi=150, bbox_inches="tight")
-        st.download_button("⬇️ Download Matplotlib chart (PNG)", buf.getvalue(),
+        st.download_button("⬇️ Download PNG", buf.getvalue(),
                            f"matplotlib_{mpl_col}.png", mime="image/png", key="mpl_dl")
         plt.close(fig_mpl)
