@@ -211,7 +211,6 @@ for col, (bg, title_c, sub_c, icon, title, sub) in zip(cols, cards):
           <div style="font-size:13px;color:{sub_c};margin-top:4px">{sub}</div>
         </div>""", unsafe_allow_html=True)
 
-st.markdown("<br>", unsafe_allow_html=True)
 st.info("👈 Use the sidebar to navigate. Start with **Upload & Profile** to load your dataset.")
 st.markdown("---")
 st.caption("DataWrangler Pro · Coursework Project — Data Wrangling & Visualization · IDs: 00017592 & 00018555")
