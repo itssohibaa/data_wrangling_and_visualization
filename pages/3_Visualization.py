@@ -37,7 +37,8 @@ THEME_COLORS = px.colors.qualitative.Bold
 LAYOUT_BASE = dict(
     font_family="Inter, sans-serif",
     title_font_size=15,
-    title_font_color="#0f172a",
+    title_font_color="#1e293b",
+    font_color="#1e293b",
     paper_bgcolor="rgba(0,0,0,0)",
     plot_bgcolor="rgba(248,250,252,1)",
     margin=dict(t=50, b=40, l=40, r=20),
