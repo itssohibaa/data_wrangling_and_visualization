@@ -183,7 +183,7 @@ with r3c2:
             g6y   = st.selectbox("Y-axis", numeric_cols, key="g6y")
             g6col = st.selectbox("Color by", ["(none)"] + categorical_cols, key="g6col")
             ca6   = g6col if g6col != "(none)" else None
-            pld   = df[[g6x, g6y] + ([g6col] if ca6 else [])].dropna().sort_values(g6x)
+           pld   = df[[g6x, g6y] + ([g6col] if ca6 else [])].dropna().sort_values(by=g6x, key=lambda x: x)
             fig   = px.line(pld, x=g6x, y=g6y, color=ca6,
                             color_discrete_sequence=THEME_COLORS,
                             labels={g6x: g6x.replace("_"," "), g6y: g6y.replace("_"," ")})
