@@ -121,7 +121,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 with st.sidebar:
-    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+    # Push toggle to the bottom
+    st.markdown("<div style='height:60vh'></div>", unsafe_allow_html=True)
+    st.markdown("---")
     dm_label = "☀️  Light mode" if st.session_state.dark_mode else "🌙  Dark mode"
     if st.button(dm_label, key="dm_toggle"):
         st.session_state.dark_mode = not st.session_state.dark_mode
