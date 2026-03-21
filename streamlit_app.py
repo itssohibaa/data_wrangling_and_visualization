@@ -55,6 +55,9 @@ LIGHT_CSS = """
     color: #f1f5f9 !important;
     border: 0.5px solid rgba(255,255,255,0.25) !important;
     white-space: nowrap !important;
+    font-size: 14px !important;
+    padding: 4px 12px !important;
+    height: auto !important;
 }
 [data-testid="stSidebar"] .stButton > button:hover {
     background: rgba(255,255,255,0.22) !important;
@@ -100,6 +103,9 @@ h1, h2, h3, h4, h5, p { color: #e2e8f0 !important; }
     color: #f1f5f9 !important;
     border: 0.5px solid rgba(255,255,255,0.25) !important;
     white-space: nowrap !important;
+    font-size: 14px !important;
+    padding: 4px 12px !important;
+    height: auto !important;
 }
 [data-testid="stSidebar"] .stButton > button:hover {
     background: rgba(255,255,255,0.22) !important;
