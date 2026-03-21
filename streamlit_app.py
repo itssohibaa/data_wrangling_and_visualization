@@ -66,19 +66,39 @@ if "history" not in st.session_state:
 
 if not st.session_state.intro_done:
     st.markdown("""
-    <div style="text-align:center; padding: 4rem 2rem;">
-      <div style="font-size:64px; margin-bottom:1rem;">🔬</div>
-      <h1 style="font-size:2.5rem; font-weight:700; color:#0f172a; margin-bottom:0.5rem;">
-        DataWrangler Pro
-      </h1>
-      <p style="font-size:1.1rem; color:#64748b; max-width:500px; margin:0 auto 2rem;">
-        Upload · Clean · Visualize · Export
-      </p>
-      <p style="color:#94a3b8; font-size:0.9rem;">Loading your workspace…</p>
+    <style>
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(16px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    .intro-wrap  { text-align:center; padding:5rem 2rem 3rem; animation:fadeIn 0.8s ease forwards; }
+    .intro-icon  { font-size:64px; margin-bottom:1.25rem; }
+    .intro-title { font-size:2.6rem; font-weight:700; color:#0f172a; margin-bottom:0.4rem; }
+    .intro-sub   { font-size:1.05rem; color:#64748b; margin-bottom:2.5rem; }
+    .intro-steps { display:flex; justify-content:center; gap:1.5rem; flex-wrap:wrap; margin-bottom:2rem; }
+    .intro-step  { font-size:0.9rem; color:#475569; background:rgba(255,255,255,0.75);
+                   padding:8px 18px; border-radius:20px; border:0.5px solid #cbd5e1; }
+    </style>
+    <div class="intro-wrap">
+      <div class="intro-icon">🔬</div>
+      <div class="intro-title">DataWrangler Pro</div>
+      <div class="intro-sub">Your AI-powered data preparation workspace</div>
+      <div class="intro-steps">
+        <span class="intro-step">📂 Upload</span>
+        <span class="intro-step">🧹 Clean</span>
+        <span class="intro-step">📊 Visualize</span>
+        <span class="intro-step">📤 Export</span>
+      </div>
     </div>
     """, unsafe_allow_html=True)
-    st.balloons()
-    time.sleep(3)
+
+    bar = st.progress(0, text="Initialising workspace…")
+    for pct, label in [(20, "Loading modules…"), (50, "Preparing components…"),
+                       (80, "Almost ready…"), (100, "✓ Ready")]:
+        time.sleep(0.5)
+        bar.progress(pct, text=label)
+    time.sleep(0.3)
+    bar.empty()
     st.session_state.intro_done = True
     st.rerun()
 
