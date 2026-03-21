@@ -51,19 +51,21 @@ def style_fig(fig, title="", xlab="", ylab=""):
     return fig
 
 def chart_download(fig, key):
-    """Provide a PNG download button for a plotly figure."""
-    try:
-        img_bytes = fig.to_image(format="png", width=1200, height=600, scale=2)
+    c1, c2 = st.columns(2)
+    with c1:
+        try:
+            img_bytes = fig.to_image(format="png", width=1200, height=600, scale=2)
+            st.download_button(
+                "⬇️ PNG", img_bytes,
+                file_name=f"chart_{key}.png", mime="image/png", key=f"dl_png_{key}"
+            )
+        except Exception:
+            st.caption("PNG unavailable")
+    with c2:
+        html_str = fig.to_html(include_plotlyjs="cdn", full_html=True)
         st.download_button(
-            "⬇️ Download chart (PNG)", img_bytes,
-            file_name=f"chart_{key}.png", mime="image/png", key=f"dl_{key}"
-        )
-    except Exception:
-        # kaleido not available — offer HTML instead
-        html_str = fig.to_html()
-        st.download_button(
-            "⬇️ Download chart (HTML)", html_str.encode(),
-            file_name=f"chart_{key}.html", mime="text/html", key=f"dl_{key}"
+            "⬇️ HTML (interactive)", html_str.encode(),
+            file_name=f"chart_{key}.html", mime="text/html", key=f"dl_html_{key}"
         )
 
 # ── FILTERS ───────────────────────────────────────────────────────────────────
