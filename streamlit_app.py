@@ -107,7 +107,7 @@ st.markdown("""
     line-height: 1.5 !important;
     text-align: left !important;
     justify-content: flex-start !important;
-    width: 100% !important;
+    width: auto !important;
     border-radius: 6px !important;
     margin-top: 4px !important;
 }
@@ -122,7 +122,7 @@ st.markdown("""
 
 with st.sidebar:
     # Push toggle to the bottom
-    st.markdown("<div style='height:33vh'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='height:28vh'></div>", unsafe_allow_html=True)
     st.markdown("---")
     dm_label = "Switch to light mode ☀️" if st.session_state.dark_mode else "Switch to dark mode 🌙"
     if st.button(dm_label, key="dm_toggle"):
