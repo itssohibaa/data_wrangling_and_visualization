@@ -48,8 +48,17 @@ LIGHT_CSS = """
 [data-testid="stMetricLabel"] { font-size: 12px !important; color: #64748b !important; }
 [data-testid="stMetricValue"] { font-size: 22px !important; font-weight: 600 !important; }
 [data-testid="stExpander"] { border: 0.5px solid #e2e8f0 !important; border-radius: 10px !important; }
-.stButton > button { border-radius: 8px; font-weight: 500; transition: all 0.15s; }
+.stButton > button { border-radius: 8px; font-weight: 500; transition: all 0.15s; white-space: nowrap; }
 .stButton > button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+[data-testid="stSidebar"] .stButton > button {
+    background: rgba(255,255,255,0.12) !important;
+    color: #f1f5f9 !important;
+    border: 0.5px solid rgba(255,255,255,0.25) !important;
+    white-space: nowrap !important;
+}
+[data-testid="stSidebar"] .stButton > button:hover {
+    background: rgba(255,255,255,0.22) !important;
+}
 .stDownloadButton > button { background: #0f172a !important; color: white !important;
     border: none !important; border-radius: 8px !important; }
 [data-testid="stSidebar"] { background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%); }
@@ -84,9 +93,17 @@ h1, h2, h3, h4, h5, p { color: #e2e8f0 !important; }
 [data-testid="stMetricValue"] { font-size: 22px !important; font-weight: 600 !important; color: #f1f5f9 !important; }
 [data-testid="stExpander"] { border: 0.5px solid #334155 !important; border-radius: 10px !important;
     background: #1e293b !important; }
-.stButton > button { border-radius: 8px; font-weight: 500; transition: all 0.15s;
-    background: #1e293b !important; color: #e2e8f0 !important; border-color: #334155 !important; }
-.stButton > button:hover { transform: translateY(-1px); background: #334155 !important; }
+.stButton > button { border-radius: 8px; font-weight: 500; transition: all 0.15s; white-space: nowrap; }
+.stButton > button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+[data-testid="stSidebar"] .stButton > button {
+    background: rgba(255,255,255,0.12) !important;
+    color: #f1f5f9 !important;
+    border: 0.5px solid rgba(255,255,255,0.25) !important;
+    white-space: nowrap !important;
+}
+[data-testid="stSidebar"] .stButton > button:hover {
+    background: rgba(255,255,255,0.22) !important;
+}
 .stDownloadButton > button { background: #3b82f6 !important; color: white !important;
     border: none !important; border-radius: 8px !important; }
 [data-testid="stSidebar"] { background: linear-gradient(180deg, #020617 0%, #0a0f1e 100%) !important; }
