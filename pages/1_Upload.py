@@ -3,173 +3,128 @@ import pandas as pd
 import numpy as np
 import io
 
-# ===============================
-# 🔹 CACHING
-# ===============================
+# ── CACHE ─────────────────────────────────────────────────────────────────────
 @st.cache_data
-def load_csv(file_bytes, file_name):
-    return pd.read_csv(io.BytesIO(file_bytes))
-
+def load_csv(b, name): return pd.read_csv(io.BytesIO(b))
 @st.cache_data
-def load_excel(file_bytes, file_name):
-    return pd.read_excel(io.BytesIO(file_bytes))
-
+def load_excel(b, name): return pd.read_excel(io.BytesIO(b))
 @st.cache_data
-def load_json(file_bytes, file_name):
-    return pd.read_json(io.BytesIO(file_bytes))
-
+def load_json(b, name): return pd.read_json(io.BytesIO(b))
 @st.cache_data
-def load_google_sheets(url):
-    return pd.read_csv(url)
+def load_sheets(url): return pd.read_csv(url)
 
-# --- SESSION INIT ---
-for key, default in [("df", None), ("log", []), ("history", []), ("last_file", "")]:
-    if key not in st.session_state:
-        st.session_state[key] = default
+# ── SESSION INIT ──────────────────────────────────────────────────────────────
+for k, v in [("df", None), ("log", []), ("history", []), ("last_file", "")]:
+    if k not in st.session_state:
+        st.session_state[k] = v
 
-st.title("📂 Upload & Data Profiling")
-
-# ===============================
-# 🔹 RESET SESSION (FIX #2)
-# Reset clears ALL state + cache so missing values
-# and everything refreshes properly on next upload
-# ===============================
-if st.button("🔄 Reset Session", type="secondary"):
-    keys_to_clear = list(st.session_state.keys())
-    for key in keys_to_clear:
-        del st.session_state[key]
-    st.cache_data.clear()
-    st.rerun()
+# ── HEADER ────────────────────────────────────────────────────────────────────
+col_title, col_reset = st.columns([5, 1])
+with col_title:
+    st.title("📂 Upload & Data Profile")
+with col_reset:
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("🔄 Reset All", type="secondary", use_container_width=True):
+        for k in list(st.session_state.keys()):
+            del st.session_state[k]
+        st.cache_data.clear()
+        st.rerun()
 
 st.markdown("---")
 
-# ===============================
-# 🔹 GOOGLE SHEETS (FIX #1)
-# Converts share URL → CSV export URL automatically
-# ===============================
-st.markdown("### 🌐 Load from Google Sheets (Optional)")
-st.caption("ℹ️ Sheet must be shared as 'Anyone with the link can view'")
-
-sheet_url = st.text_input("Paste Google Sheets share link")
-
-if sheet_url and st.button("Load Google Sheets"):
-    try:
-        if "/edit" in sheet_url:
-            if "gid=" in sheet_url:
-                gid = sheet_url.split("gid=")[-1].split("&")[0].split("#")[0]
+# ── GOOGLE SHEETS ─────────────────────────────────────────────────────────────
+with st.expander("🌐 Load from Google Sheets (Optional)", expanded=False):
+    st.caption("Sheet must be shared as 'Anyone with the link can view'")
+    sheet_url = st.text_input("Paste Google Sheets share link", key="gs_url")
+    if st.button("Load Google Sheets") and sheet_url:
+        try:
+            if "/edit" in sheet_url:
+                gid = sheet_url.split("gid=")[-1].split("&")[0].split("#")[0] if "gid=" in sheet_url else "0"
                 base = sheet_url.split("/edit")[0]
                 csv_url = f"{base}/export?format=csv&gid={gid}"
             else:
-                base = sheet_url.split("/edit")[0]
-                csv_url = f"{base}/export?format=csv"
-        elif "/pub" in sheet_url:
-            csv_url = sheet_url.replace("pubhtml", "pub?output=csv")
-        else:
-            csv_url = sheet_url
+                csv_url = sheet_url
+            df = load_sheets(csv_url)
+            st.session_state.df = df
+            st.session_state.history = [df.copy()]
+            st.session_state.last_file = "google_sheets"
+            st.session_state.log = ["Loaded from Google Sheets"]
+            st.success(f"✅ Loaded {df.shape[0]:,} rows x {df.shape[1]} columns from Google Sheets")
+        except Exception as e:
+            st.error(f"Could not load sheet. Make sure it is publicly accessible. Error: {e}")
 
-        df = load_google_sheets(csv_url)
-        st.session_state.df = df
-        st.session_state.log.append("Loaded from Google Sheets")
-        st.session_state.history.append(df.copy())
-        st.session_state.last_file = "google_sheets"
-        st.success("✅ Google Sheets loaded successfully!")
-    except Exception as e:
-        st.error(f"❌ Could not load sheet. Make sure it's publicly accessible. Error: {e}")
-
-st.markdown("---")
-
-# ===============================
-# 🔹 FILE UPLOAD
-# ===============================
-file = st.file_uploader("📁 Upload CSV / Excel / JSON", type=["csv", "xlsx", "json"])
+# ── FILE UPLOAD ───────────────────────────────────────────────────────────────
+file = st.file_uploader("📁 Upload your dataset", type=["csv", "xlsx", "json"],
+                         help="CSV, Excel (.xlsx), or JSON")
 
 if file is not None:
     try:
-        file_bytes = file.read()
-        if file.name.endswith(".csv"):
-            df = load_csv(file_bytes, file.name)
-        elif file.name.endswith(".xlsx"):
-            df = load_excel(file_bytes, file.name)
-        elif file.name.endswith(".json"):
-            df = load_json(file_bytes, file.name)
+        b = file.read()
+        if file.name.endswith(".csv"):    df = load_csv(b, file.name)
+        elif file.name.endswith(".xlsx"): df = load_excel(b, file.name)
+        elif file.name.endswith(".json"): df = load_json(b, file.name)
         else:
-            st.error("Unsupported file type")
-            st.stop()
+            st.error("Unsupported file type"); st.stop()
 
-        # Always update df (FIX #3: new file = fresh data, no stale cache issue)
         if st.session_state.last_file != file.name or st.session_state.df is None:
             st.session_state.df = df
             st.session_state.history = [df.copy()]
             st.session_state.last_file = file.name
-            st.session_state.log.append(f"Dataset uploaded: {file.name}")
+            st.session_state.log = [f"Dataset uploaded: {file.name}"]
 
-        st.success(f"✅ '{file.name}' loaded — {df.shape[0]:,} rows × {df.shape[1]} columns")
-
+        st.success(f"✅ **{file.name}** — {df.shape[0]:,} rows x {df.shape[1]} columns")
     except Exception as e:
-        st.error(f"❌ Error loading file: {e}")
-        st.stop()
+        st.error(f"Error loading file: {e}"); st.stop()
 
-# ===============================
-# 🔹 DATASET OVERVIEW
-# FIX #3: Missing values always computed from current df
-# FIX #4: Missing values count added to overview metrics
-# ===============================
-if st.session_state.df is not None:
-    df = st.session_state.df
+if st.session_state.df is None:
+    st.info("💡 Upload a file above or try one of the sample datasets from the `sample_data/` folder.")
+    st.stop()
 
-    st.subheader("📊 Dataset Overview")
+# ── OVERVIEW ──────────────────────────────────────────────────────────────────
+df = st.session_state.df
+st.subheader("📊 Dataset Overview")
 
-    total_missing = int(df.isnull().sum().sum())
-    total_cells = df.shape[0] * df.shape[1]
-    missing_pct = round(total_missing / total_cells * 100, 1) if total_cells > 0 else 0
-    duplicates = int(df.duplicated().sum())
+total_missing = int(df.isnull().sum().sum())
+total_cells   = df.shape[0] * df.shape[1]
+missing_pct   = round(total_missing / total_cells * 100, 1) if total_cells > 0 else 0
+dupes         = int(df.duplicated().sum())
 
-    # 5 metric cards
-    m1, m2, m3, m4, m5 = st.columns(5)
-    m1.metric("🗂 Rows", f"{df.shape[0]:,}")
-    m2.metric("📋 Columns", df.shape[1])
-    m3.metric("🔁 Duplicate Rows", f"{duplicates:,}")
-    m4.metric("❓ Missing Cells", f"{total_missing:,}")
-    m5.metric("📉 Missing %", f"{missing_pct}%")
+m1, m2, m3, m4, m5 = st.columns(5)
+m1.metric("Rows",          f"{df.shape[0]:,}")
+m2.metric("Columns",       df.shape[1])
+m3.metric("Duplicates",    f"{dupes:,}")
+m4.metric("Missing Cells", f"{total_missing:,}")
+m5.metric("Missing %",     f"{missing_pct}%")
 
-    st.markdown("---")
+st.markdown("---")
+st.write("### Missing Values by Column")
+mv = pd.DataFrame({
+    "Missing Count": df.isnull().sum(),
+    "Missing %": (df.isnull().sum() / len(df) * 100).round(2)
+})
+mv_f = mv[mv["Missing Count"] > 0]
+if mv_f.empty:
+    st.success("No missing values found!")
+else:
+    st.dataframe(mv_f.style.background_gradient(cmap="Reds", subset=["Missing %"]),
+                 use_container_width=True)
 
-    # ---- Missing Values Detail ----
-    st.write("### 🔍 Missing Values by Column")
-    missing_series = df.isnull().sum()
-    missing_df = pd.DataFrame({
-        "Missing Count": missing_series,
-        "Missing %": (missing_series / len(df) * 100).round(2)
-    })
-    missing_with_data = missing_df[missing_df["Missing Count"] > 0]
+st.markdown("---")
+st.write("### Column Info")
+info_df = pd.DataFrame({
+    "Column":   df.columns,
+    "Type":     df.dtypes.astype(str).values,
+    "Non-Null": df.notnull().sum().values,
+    "Unique":   [df[c].nunique() for c in df.columns],
+    "Sample":   [str(df[c].dropna().iloc[0]) if not df[c].dropna().empty else "N/A" for c in df.columns]
+}).reset_index(drop=True)
+st.dataframe(info_df, use_container_width=True)
 
-    if missing_with_data.empty:
-        st.success("✅ No missing values found in this dataset!")
-    else:
-        st.dataframe(missing_with_data.style.background_gradient(cmap="Reds", subset=["Missing %"]),
-                     use_container_width=True)
+st.markdown("---")
+st.write("### Summary Statistics")
+st.dataframe(df.describe(include="all").T, use_container_width=True)
 
-    st.markdown("---")
-
-    # ---- Column Info ----
-    st.write("### 🏷️ Column Types & Info")
-    dtype_df = pd.DataFrame({
-        "Column": df.columns,
-        "Type": df.dtypes.values.astype(str),
-        "Non-Null Count": df.notnull().sum().values,
-        "Unique Values": [df[c].nunique() for c in df.columns],
-        "Sample Value": [str(df[c].dropna().iloc[0]) if not df[c].dropna().empty else "N/A" for c in df.columns]
-    }).reset_index(drop=True)
-    st.dataframe(dtype_df, use_container_width=True)
-
-    st.markdown("---")
-
-    # ---- Summary Stats ----
-    st.write("### 📈 Summary Statistics")
-    st.dataframe(df.describe(include="all").T, use_container_width=True)
-
-    st.markdown("---")
-
-    # ---- Preview ----
-    st.write("### 👁️ Data Preview (first 10 rows)")
-    st.dataframe(df.head(10), use_container_width=True)
+st.markdown("---")
+st.write("### Data Preview")
+n_rows = st.slider("Rows to preview", 5, 50, 10)
+st.dataframe(df.head(n_rows), use_container_width=True)
