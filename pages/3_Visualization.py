@@ -16,7 +16,11 @@ if st.session_state.df is None:
     st.warning("Upload data first on the Upload page."); st.stop()
 
 df = st.session_state.df.copy()
-df.columns = pd.io.common.dedup_names(df.columns.tolist(), is_potential_multiindex=False)
+# Deduplicate column names
+cols = pd.Series(df.columns)
+for dup in cols[cols.duplicated()].unique():
+    cols[cols == dup] = [f"{dup}_{i}" if i != 0 else dup for i, _ in enumerate(cols[cols == dup])]
+df.columns = cols
 
 categorical_cols = df.select_dtypes(include=["object","category"]).columns.tolist()
 numeric_cols     = df.select_dtypes(include=np.number).columns.tolist()
