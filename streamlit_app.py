@@ -19,7 +19,7 @@ if "dark_mode" not in st.session_state:
 # ── DARK MODE TOGGLE (sidebar — always visible) ───────────────────────────────
 with st.sidebar:
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-    dm_label = "☀️ Switch to Light Mode" if st.session_state.dark_mode else "🌙 Switch to Dark Mode"
+    dm_label = "☀️ Light Mode" if st.session_state.dark_mode else "🌙 Dark Mode"
     if st.button(dm_label, use_container_width=True, key="dm_toggle"):
         st.session_state.dark_mode = not st.session_state.dark_mode
         st.rerun()
