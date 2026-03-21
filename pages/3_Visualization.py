@@ -16,6 +16,7 @@ if st.session_state.df is None:
     st.warning("Upload data first on the Upload page."); st.stop()
 
 df = st.session_state.df.copy()
+df.columns = pd.io.common.dedup_names(df.columns.tolist(), is_potential_multiindex=False)
 
 categorical_cols = df.select_dtypes(include=["object","category"]).columns.tolist()
 numeric_cols     = df.select_dtypes(include=np.number).columns.tolist()
