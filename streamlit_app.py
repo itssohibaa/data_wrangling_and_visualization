@@ -16,15 +16,6 @@ if "history" not in st.session_state:
 if "dark_mode" not in st.session_state:
     st.session_state.dark_mode = False
 
-# ── DARK MODE TOGGLE (sidebar — always visible) ───────────────────────────────
-with st.sidebar:
-    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
-    dm_label = "☀️ Light Mode" if st.session_state.dark_mode else "🌙 Dark Mode"
-    if st.button(dm_label, use_container_width=True, key="dm_toggle"):
-        st.session_state.dark_mode = not st.session_state.dark_mode
-        st.rerun()
-    st.markdown("---")
-
 # ── LIGHT MODE CSS ────────────────────────────────────────────────────────────
 LIGHT_CSS = """
 <style>
@@ -48,20 +39,8 @@ LIGHT_CSS = """
 [data-testid="stMetricLabel"] { font-size: 12px !important; color: #64748b !important; }
 [data-testid="stMetricValue"] { font-size: 22px !important; font-weight: 600 !important; }
 [data-testid="stExpander"] { border: 0.5px solid #e2e8f0 !important; border-radius: 10px !important; }
-.stButton > button { border-radius: 8px; font-weight: 500; transition: all 0.15s; white-space: nowrap; }
+.stButton > button { border-radius: 8px; font-weight: 500; transition: all 0.15s; }
 .stButton > button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-[data-testid="stSidebar"] .stButton > button {
-    background: rgba(255,255,255,0.12) !important;
-    color: #f1f5f9 !important;
-    border: 0.5px solid rgba(255,255,255,0.25) !important;
-    white-space: nowrap !important;
-    font-size: 14px !important;
-    padding: 4px 12px !important;
-    height: auto !important;
-}
-[data-testid="stSidebar"] .stButton > button:hover {
-    background: rgba(255,255,255,0.22) !important;
-}
 .stDownloadButton > button { background: #0f172a !important; color: white !important;
     border: none !important; border-radius: 8px !important; }
 [data-testid="stSidebar"] { background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%); }
@@ -96,20 +75,8 @@ h1, h2, h3, h4, h5, p { color: #e2e8f0 !important; }
 [data-testid="stMetricValue"] { font-size: 22px !important; font-weight: 600 !important; color: #f1f5f9 !important; }
 [data-testid="stExpander"] { border: 0.5px solid #334155 !important; border-radius: 10px !important;
     background: #1e293b !important; }
-.stButton > button { border-radius: 8px; font-weight: 500; transition: all 0.15s; white-space: nowrap; }
-.stButton > button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-[data-testid="stSidebar"] .stButton > button {
-    background: rgba(255,255,255,0.12) !important;
-    color: #f1f5f9 !important;
-    border: 0.5px solid rgba(255,255,255,0.25) !important;
-    white-space: nowrap !important;
-    font-size: 14px !important;
-    padding: 4px 12px !important;
-    height: auto !important;
-}
-[data-testid="stSidebar"] .stButton > button:hover {
-    background: rgba(255,255,255,0.22) !important;
-}
+.stButton > button { border-radius: 8px; font-weight: 500; transition: all 0.15s; }
+.stButton > button:hover { transform: translateY(-1px); }
 .stDownloadButton > button { background: #3b82f6 !important; color: white !important;
     border: none !important; border-radius: 8px !important; }
 [data-testid="stSidebar"] { background: linear-gradient(180deg, #020617 0%, #0a0f1e 100%) !important; }
@@ -123,6 +90,42 @@ h1, h2, h3, h4, h5, p { color: #e2e8f0 !important; }
 """
 
 st.markdown(DARK_CSS if st.session_state.dark_mode else LIGHT_CSS, unsafe_allow_html=True)
+
+# ── SIDEBAR DARK MODE TOGGLE — styled to match nav link size ─────────────────
+st.markdown("""
+<style>
+[data-testid="stSidebar"] [data-testid="stButton"] > button {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #94a3b8 !important;
+    font-size: 14px !important;
+    font-weight: 400 !important;
+    padding: 6px 12px !important;
+    height: auto !important;
+    min-height: unset !important;
+    line-height: 1.5 !important;
+    text-align: left !important;
+    justify-content: flex-start !important;
+    width: 100% !important;
+    border-radius: 6px !important;
+    margin-top: 4px !important;
+}
+[data-testid="stSidebar"] [data-testid="stButton"] > button:hover {
+    background: rgba(255,255,255,0.07) !important;
+    color: #e2e8f0 !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+with st.sidebar:
+    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+    dm_label = "☀️  Light mode" if st.session_state.dark_mode else "🌙  Dark mode"
+    if st.button(dm_label, key="dm_toggle"):
+        st.session_state.dark_mode = not st.session_state.dark_mode
+        st.rerun()
 
 # ── INTRO (once per session) ──────────────────────────────────────────────────
 if not st.session_state.intro_done:
@@ -180,13 +183,12 @@ st.markdown(f"""
 
 st.markdown("---")
 
-# Feature cards — adapt colors for dark mode
 if st.session_state.dark_mode:
     cards = [
-        ("#1e3a5f", "#2563eb", "#93c5fd", "📂", "Upload & Profile",  "CSV · Excel · JSON · Sheets"),
-        ("#14532d", "#16a34a", "#86efac", "🧹", "Clean & Prepare",   "Missing · Duplicates · Scale"),
-        ("#3b0764", "#9333ea", "#d8b4fe", "📊", "Visualize",         "8 chart types · 3D · Download"),
-        ("#431407", "#ea580c", "#fdba74", "📤", "Export",            "CSV · Excel · Report · Recipe"),
+        ("#1e3a5f", "#93c5fd", "#60a5fa", "📂", "Upload & Profile",  "CSV · Excel · JSON · Sheets"),
+        ("#14532d", "#86efac", "#4ade80", "🧹", "Clean & Prepare",   "Missing · Duplicates · Scale"),
+        ("#3b0764", "#d8b4fe", "#c084fc", "📊", "Visualize",         "8 chart types · 3D · Download"),
+        ("#431407", "#fdba74", "#fb923c", "📤", "Export",            "CSV · Excel · Report · Recipe"),
     ]
 else:
     cards = [
@@ -201,7 +203,7 @@ for col, (bg, title_c, sub_c, icon, title, sub) in zip(cols, cards):
     with col:
         st.markdown(f"""
         <div style="background:{bg};border-radius:12px;padding:1.25rem;
-                    border:0.5px solid {sub_c}33;">
+                    border:0.5px solid {sub_c}55;">
           <div style="font-size:28px">{icon}</div>
           <div style="font-weight:600;margin-top:8px;color:{title_c}">{title}</div>
           <div style="font-size:13px;color:{sub_c};margin-top:4px">{sub}</div>
