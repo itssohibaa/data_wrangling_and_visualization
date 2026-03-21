@@ -57,23 +57,15 @@ def style_fig(fig, title="", xlab="", ylab=""):
     return fig
 
 def chart_download(fig, key):
-    c1, c2 = st.columns(2)
-    with c1:
-        try:
-            img_bytes = fig.to_image(format="png", width=1400, height=700, scale=2)
-            st.download_button("⬇️ PNG", img_bytes,
-                               file_name=f"chart_{key}.png", mime="image/png",
-                               key=f"dl_png_{key}")
-        except Exception:
-            st.caption("PNG unavailable")
-    with c2:
-        try:
-            svg_bytes = fig.to_image(format="svg", width=1400, height=700)
-            st.download_button("⬇️ SVG", svg_bytes,
-                               file_name=f"chart_{key}.svg", mime="image/svg+xml",
-                               key=f"dl_svg_{key}")
-        except Exception:
-            st.caption("SVG unavailable")
+    html_str = fig.to_html(include_plotlyjs="cdn", full_html=True,
+                           config={"toImageButtonOptions": {"format": "png", "width": 1400, "height": 700}})
+    st.download_button(
+        "⬇️ Download chart",
+        html_str.encode(),
+        file_name=f"chart_{key}.html",
+        mime="text/html",
+        key=f"dl_{key}"
+    )
 
 # ── FILTERS ───────────────────────────────────────────────────────────────────
 with st.expander("🔎 Filters", expanded=False):
