@@ -180,6 +180,7 @@ with r3c1:
             chart_download(fig, "g5")
 
 # Chart 6 — Line
+# Chart 6 — Line
 with r3c2:
     with st.container(border=True):
         st.markdown("**Trend (Line Chart)**")
@@ -188,16 +189,21 @@ with r3c2:
             g6y   = st.selectbox("Y-axis", numeric_cols, key="g6y")
             g6col = st.selectbox("Color by", ["(none)"] + categorical_cols, key="g6col")
             ca6   = g6col if g6col != "(none)" else None
-            pld = df.loc[:, ~df.columns.duplicated()].copy()
-            pld = pld[[g6x, g6y] + ([g6col] if ca6 else [])].dropna().reset_index(drop=True)
-            fig   = px.line(pld, x=g6x, y=g6y, color=ca6,
-                            color_discrete_sequence=THEME_COLORS,
-                            labels={g6x: g6x.replace("_"," "), g6y: g6y.replace("_"," ")})
-            fig = style_fig(fig, f"{g6y} over {g6x}", g6x.replace("_"," "), g6y.replace("_"," "))
-            st.plotly_chart(fig, use_container_width=True, key="g6")
-            chart_download(fig, "g6")
-
-st.markdown("---")
+            try:
+                cols_needed = [g6x, g6y] + ([g6col] if ca6 else [])
+                pld = df[cols_needed].copy()
+                pld.columns = [f"col_{i}" for i in range(len(pld.columns))]
+                xcol, ycol = "col_0", "col_1"
+                ccol = "col_2" if ca6 else None
+                pld = pld.dropna().sort_values(xcol)
+                fig = px.line(pld, x=xcol, y=ycol, color=ccol,
+                              color_discrete_sequence=THEME_COLORS)
+                fig = style_fig(fig, f"{g6y} over {g6x}",
+                                g6x.replace("_"," "), g6y.replace("_"," "))
+                st.plotly_chart(fig, use_container_width=True, key="g6")
+                chart_download(fig, "g6")
+            except Exception as e:
+                st.warning(f"Could not render line chart: {e}")
 
 # ════════════════════════════════════════════════════════════════════════════════
 # CUSTOM CHART BUILDER — 8 chart types incl. 3D
