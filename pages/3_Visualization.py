@@ -1,4 +1,10 @@
 import streamlit as st
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils import apply_theme
+st.session_state["_page_key"] = "3_Visualization"
+apply_theme()
+
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
