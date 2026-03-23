@@ -1,9 +1,20 @@
 import streamlit as st
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils import apply_theme
+st.session_state["_page_key"] = "1_Upload"
+apply_theme()
+
 import pandas as pd
 import numpy as np
 import io
 
 # ── CACHE ─────────────────────────────────────────────────────────────────────
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from theme import apply_theme
+apply_theme()
+
 @st.cache_data
 def load_csv(b, name): return pd.read_csv(io.BytesIO(b))
 @st.cache_data
