@@ -1,6 +1,17 @@
 import streamlit as st
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils import apply_theme
+st.session_state["_page_key"] = "2_Cleaning"
+apply_theme()
+
 import pandas as pd
 import numpy as np
+
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from theme import apply_theme
+apply_theme()
 
 for k, v in [("df", None), ("log", []), ("history", [])]:
     if k not in st.session_state:
@@ -43,11 +54,7 @@ with st.expander("🔍 1. Missing Values", expanded=True):
     if mv_f.empty:
         st.success("No missing values!")
     else:
-        st.dataframe(
-    mv_f.style.background_gradient(cmap="Reds", subset=["Missing %"])
-              .format({"Missing Count": "{:,.0f}", "Missing %": "{:.2f}%"}),
-    use_container_width=True
-)
+        st.dataframe(mv_f, use_container_width=True)
         col = st.selectbox("Column to fix", mv_f.index.tolist(), key="mv_col")
         ctype = df[col].dtype
         st.info(f"`{col}` — type: `{ctype}` — {int(df[col].isnull().sum())} missing")
