@@ -2,6 +2,7 @@ import streamlit as st
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils import apply_theme
+
 st.session_state["_page_key"] = "1_Upload"
 apply_theme()
 
@@ -10,19 +11,14 @@ import numpy as np
 import io
 
 # ── CACHE ─────────────────────────────────────────────────────────────────────
-import sys, os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from theme import apply_theme
-apply_theme()
-
 @st.cache_data
-def load_csv(b, name): return pd.read_csv(io.BytesIO(b))
+def load_csv(b, name):    return pd.read_csv(io.BytesIO(b))
 @st.cache_data
-def load_excel(b, name): return pd.read_excel(io.BytesIO(b))
+def load_excel(b, name):  return pd.read_excel(io.BytesIO(b))
 @st.cache_data
-def load_json(b, name): return pd.read_json(io.BytesIO(b))
+def load_json(b, name):   return pd.read_json(io.BytesIO(b))
 @st.cache_data
-def load_sheets(url): return pd.read_csv(url)
+def load_sheets(url):     return pd.read_csv(url)
 
 # ── SESSION INIT ──────────────────────────────────────────────────────────────
 for k, v in [("df", None), ("log", []), ("history", []), ("last_file", "")]:
@@ -60,7 +56,7 @@ with st.expander("🌐 Load from Google Sheets (Optional)", expanded=False):
             st.session_state.history = [df.copy()]
             st.session_state.last_file = "google_sheets"
             st.session_state.log = ["Loaded from Google Sheets"]
-            st.success(f"✅ Loaded {df.shape[0]:,} rows x {df.shape[1]} columns from Google Sheets")
+            st.success(f"✅ Loaded {df.shape[0]:,} rows × {df.shape[1]} columns from Google Sheets")
         except Exception as e:
             st.error(f"Could not load sheet. Make sure it is publicly accessible. Error: {e}")
 
@@ -71,7 +67,7 @@ file = st.file_uploader("📁 Upload your dataset", type=["csv", "xlsx", "json"]
 if file is not None:
     try:
         b = file.read()
-        if file.name.endswith(".csv"):    df = load_csv(b, file.name)
+        if   file.name.endswith(".csv"):  df = load_csv(b, file.name)
         elif file.name.endswith(".xlsx"): df = load_excel(b, file.name)
         elif file.name.endswith(".json"): df = load_json(b, file.name)
         else:
@@ -83,12 +79,12 @@ if file is not None:
             st.session_state.last_file = file.name
             st.session_state.log = [f"Dataset uploaded: {file.name}"]
 
-        st.success(f"✅ **{file.name}** — {df.shape[0]:,} rows x {df.shape[1]} columns")
+        st.success(f"✅ **{file.name}** — {df.shape[0]:,} rows × {df.shape[1]} columns")
     except Exception as e:
         st.error(f"Error loading file: {e}"); st.stop()
 
 if st.session_state.df is None:
-    st.info("💡 Upload a file above or try one of the sample datasets from the `sample_data/` folder.")
+    st.info("💡 Upload a file above or try a sample dataset from the `sample_data/` folder.")
     st.stop()
 
 # ── OVERVIEW ──────────────────────────────────────────────────────────────────
@@ -99,29 +95,35 @@ total_missing = int(df.isnull().sum().sum())
 total_cells   = df.shape[0] * df.shape[1]
 missing_pct   = round(total_missing / total_cells * 100, 1) if total_cells > 0 else 0
 dupes         = int(df.duplicated().sum())
+num_cols_count = len(df.select_dtypes(include=np.number).columns)
 
-m1, m2, m3, m4, m5 = st.columns(5)
+m1, m2, m3, m4, m5, m6 = st.columns(6)
 m1.metric("Rows",          f"{df.shape[0]:,}")
 m2.metric("Columns",       df.shape[1])
-m3.metric("Duplicates",    f"{dupes:,}")
-m4.metric("Missing Cells", f"{total_missing:,}")
-m5.metric("Missing %",     f"{missing_pct}%")
+m3.metric("Numeric Cols",  num_cols_count)
+m4.metric("Duplicates",    f"{dupes:,}")
+m5.metric("Missing Cells", f"{total_missing:,}")
+m6.metric("Missing %",     f"{missing_pct}%")
 
 st.markdown("---")
-st.write("### Missing Values by Column")
+
+# ── MISSING VALUES ────────────────────────────────────────────────────────────
+st.write("### 🔍 Missing Values by Column")
 mv = pd.DataFrame({
     "Missing Count": df.isnull().sum(),
     "Missing %": (df.isnull().sum() / len(df) * 100).round(2)
 })
 mv_f = mv[mv["Missing Count"] > 0]
 if mv_f.empty:
-    st.success("No missing values found!")
+    st.success("✅ No missing values found!")
 else:
     st.dataframe(mv_f.style.background_gradient(cmap="Reds", subset=["Missing %"]),
                  use_container_width=True)
 
 st.markdown("---")
-st.write("### Column Info")
+
+# ── COLUMN INFO ───────────────────────────────────────────────────────────────
+st.write("### 📋 Column Info")
 info_df = pd.DataFrame({
     "Column":   df.columns,
     "Type":     df.dtypes.astype(str).values,
@@ -132,10 +134,14 @@ info_df = pd.DataFrame({
 st.dataframe(info_df, use_container_width=True)
 
 st.markdown("---")
-st.write("### Summary Statistics")
+
+# ── SUMMARY STATS ─────────────────────────────────────────────────────────────
+st.write("### 📈 Summary Statistics")
 st.dataframe(df.describe(include="all").T, use_container_width=True)
 
 st.markdown("---")
-st.write("### Data Preview")
-n_rows = st.slider("Rows to preview", 5, 50, 10)
+
+# ── DATA PREVIEW ─────────────────────────────────────────────────────────────
+st.write("### 👁️ Data Preview")
+n_rows = st.slider("Rows to preview", 5, 100, 10)
 st.dataframe(df.head(n_rows), use_container_width=True)
