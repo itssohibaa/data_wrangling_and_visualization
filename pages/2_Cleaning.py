@@ -2,16 +2,12 @@ import streamlit as st
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils import apply_theme
+
 st.session_state["_page_key"] = "2_Cleaning"
 apply_theme()
 
 import pandas as pd
 import numpy as np
-
-import sys, os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from theme import apply_theme
-apply_theme()
 
 for k, v in [("df", None), ("log", []), ("history", [])]:
     if k not in st.session_state:
@@ -20,7 +16,8 @@ for k, v in [("df", None), ("log", []), ("history", [])]:
 st.title("🧹 Cleaning & Preparation Studio")
 
 if st.session_state.df is None:
-    st.warning("Please upload a dataset first."); st.stop()
+    st.warning("Please upload a dataset first.")
+    st.stop()
 
 df = st.session_state.df.copy()
 
@@ -52,7 +49,7 @@ with st.expander("🔍 1. Missing Values", expanded=True):
     })
     mv_f = mv[mv["Missing Count"] > 0]
     if mv_f.empty:
-        st.success("No missing values!")
+        st.success("✅ No missing values!")
     else:
         st.dataframe(mv_f, use_container_width=True)
         col = st.selectbox("Column to fix", mv_f.index.tolist(), key="mv_col")
@@ -66,9 +63,12 @@ with st.expander("🔍 1. Missing Values", expanded=True):
         method = st.selectbox("Fill method", opts, key="mv_method")
         const_val = st.text_input("Constant value", key="mv_const") if method == "Constant value" else ""
 
+        # Before / after preview
+        before_count = int(df[col].isnull().sum())
+        st.caption(f"**Before:** {before_count} missing in `{col}`")
+
         if st.button("Apply Missing Value Fix", key="mv_apply"):
             st.session_state.history.append(df.copy())
-            before = int(df[col].isnull().sum())
             try:
                 if method == "Drop rows":              df = df.dropna(subset=[col])
                 elif method == "Mean":                 df[col] = df[col].fillna(df[col].mean())
@@ -80,10 +80,10 @@ with st.expander("🔍 1. Missing Values", expanded=True):
                     df[col] = df[col].fillna(fill)
                 elif method == "Forward Fill":  df[col] = df[col].ffill()
                 elif method == "Backward Fill": df[col] = df[col].bfill()
-                after = int(df[col].isnull().sum())
+                after = int(df[col].isnull().sum()) if col in df.columns else 0
                 st.session_state.df = df
                 st.session_state.log.append(f"Missing values in '{col}' handled with {method}")
-                st.success(f"Fixed {before - after} missing values (was {before}, now {after})")
+                st.success(f"✅ Fixed {before_count - after} missing values (was {before_count}, now {after})")
                 st.rerun()
             except Exception as e:
                 st.error(f"Error: {e}")
@@ -100,330 +100,336 @@ with st.expander("🔁 2. Duplicate Detection & Treatment", expanded=False):
     if dup_mode == "Subset of columns":
         subset = st.multiselect("Key columns", df.columns.tolist(), key="dup_subset")
 
-    check_subset = subset if (dup_mode == "Subset of columns" and subset) else None
-    n_d = int(df.duplicated(subset=check_subset).sum())
-    st.info(f"Found **{n_d}** duplicate(s) with current selection.")
+    keep_opt = st.radio("Keep", ["first", "last"], horizontal=True, key="dup_keep")
 
-    action = st.selectbox("Action", [
-        "Show duplicate groups",
-        "Remove duplicates (keep first)",
-        "Remove duplicates (keep last)"
-    ], key="dup_action")
+    if subset or dup_mode == "Full row":
+        mask = df.duplicated(subset=subset if subset else None, keep=False)
+        n_dups = int(mask.sum())
+        if n_dups > 0:
+            st.warning(f"{n_dups} duplicate rows found.")
+            with st.expander("Show duplicate groups"):
+                st.dataframe(df[mask].head(50), use_container_width=True)
+        else:
+            st.success("No duplicates found with current selection.")
 
-    if st.button("Apply", key="dup_apply"):
+    if st.button("Remove Duplicates", key="dup_apply"):
+        st.session_state.history.append(df.copy())
+        before = len(df)
+        df = df.drop_duplicates(subset=subset if subset else None, keep=keep_opt)
+        removed = before - len(df)
+        st.session_state.df = df
+        st.session_state.log.append(f"Removed {removed} duplicate rows (keep={keep_opt}, subset={subset})")
+        st.success(f"✅ Removed {removed} duplicates. {len(df):,} rows remaining.")
+        st.rerun()
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 3. DATA TYPES & PARSING
+# ═══════════════════════════════════════════════════════════════════════════════
+with st.expander("🔄 3. Data Types & Parsing", expanded=False):
+    col3 = st.selectbox("Column", df.columns.tolist(), key="dt_col")
+    cur_type = str(df[col3].dtype)
+    st.info(f"Current type: `{cur_type}`")
+    target_type = st.selectbox("Convert to", ["numeric", "string / categorical", "datetime"], key="dt_type")
+    dt_fmt = st.text_input("Datetime format (leave blank for auto)", key="dt_fmt",
+                           placeholder="%Y-%m-%d") if target_type == "datetime" else ""
+    clean_num = st.checkbox("Clean dirty numerics (remove $, commas, spaces)", key="dt_clean") \
+                if target_type == "numeric" else False
+
+    if st.button("Convert Type", key="dt_apply"):
         st.session_state.history.append(df.copy())
         try:
-            if action == "Show duplicate groups":
-                mask = df.duplicated(subset=check_subset, keep=False)
-                g = df[mask]
-                st.write(f"{len(g)} rows involved:"); st.dataframe(g.head(100), use_container_width=True)
-            else:
-                keep = "first" if "first" in action else "last"
-                before = len(df)
-                df = df.drop_duplicates(subset=check_subset, keep=keep)
-                st.session_state.df = df
-                st.session_state.log.append(f"Removed duplicates ({keep}) — subset: {check_subset or 'all'}")
-                st.success(f"Removed {before - len(df)} rows. Now {len(df):,} rows.")
-                st.rerun()
+            if target_type == "numeric":
+                if clean_num:
+                    df[col3] = df[col3].astype(str).str.replace(r"[\$,\s]", "", regex=True)
+                df[col3] = pd.to_numeric(df[col3], errors="coerce")
+            elif target_type == "string / categorical":
+                df[col3] = df[col3].astype(str)
+            elif target_type == "datetime":
+                if dt_fmt:
+                    df[col3] = pd.to_datetime(df[col3], format=dt_fmt, errors="coerce")
+                else:
+                    df[col3] = pd.to_datetime(df[col3], infer_datetime_format=True, errors="coerce")
+            st.session_state.df = df
+            st.session_state.log.append(f"Converted '{col3}' to {target_type}")
+            st.success(f"✅ `{col3}` converted to {target_type}")
+            st.rerun()
         except Exception as e:
             st.error(f"Error: {e}")
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 3. CATEGORICAL TOOLS
+# 4. CATEGORICAL DATA TOOLS
 # ═══════════════════════════════════════════════════════════════════════════════
-with st.expander("🏷️ 3. Categorical Tools", expanded=False):
-    cat_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
+with st.expander("🏷️ 4. Categorical Data Tools", expanded=False):
+    cat_cols = df.select_dtypes(include=["object","category"]).columns.tolist()
     if not cat_cols:
-        st.info("No categorical columns found.")
+        st.info("No categorical columns detected.")
     else:
-        cat_op = st.selectbox("Operation", [
-            "Standardize casing / trim whitespace",
-            "Map / replace values",
-            "Group rare categories into 'Other'",
-            "One-hot encoding"
-        ], key="cat_op")
         cat_col = st.selectbox("Column", cat_cols, key="cat_col")
+        st.caption(f"Unique values: {df[cat_col].nunique()} | Sample: {df[cat_col].dropna().unique()[:6].tolist()}")
 
-        if cat_op == "Standardize casing / trim whitespace":
-            casing = st.selectbox("Apply", ["Trim whitespace only", "lowercase", "UPPERCASE", "Title Case"], key="cat_case")
-            if st.button("Apply Standardization", key="cat_std"):
+        cat_op = st.radio("Operation", [
+            "Trim whitespace & fix case",
+            "Replace / map values",
+            "Group rare categories → Other",
+            "One-hot encode"
+        ], key="cat_op")
+
+        if cat_op == "Trim whitespace & fix case":
+            case_opt = st.selectbox("Case", ["lower","upper","title","no change"], key="cat_case")
+            if st.button("Apply", key="cat_clean_apply"):
                 st.session_state.history.append(df.copy())
                 df[cat_col] = df[cat_col].astype(str).str.strip()
-                if casing == "lowercase":     df[cat_col] = df[cat_col].str.lower()
-                elif casing == "UPPERCASE":   df[cat_col] = df[cat_col].str.upper()
-                elif casing == "Title Case":  df[cat_col] = df[cat_col].str.title()
+                if case_opt == "lower":  df[cat_col] = df[cat_col].str.lower()
+                elif case_opt == "upper": df[cat_col] = df[cat_col].str.upper()
+                elif case_opt == "title": df[cat_col] = df[cat_col].str.title()
                 st.session_state.df = df
-                st.session_state.log.append(f"Standardized casing of '{cat_col}': {casing}")
-                st.success("Done!"); st.rerun()
+                st.session_state.log.append(f"Standardised '{cat_col}' (trim + {case_opt} case)")
+                st.success(f"✅ Standardised `{cat_col}`")
+                st.rerun()
 
-        elif cat_op == "Map / replace values":
-            unique_vals = df[cat_col].dropna().unique().tolist()
-            st.caption(f"Unique values in `{cat_col}`: {unique_vals[:20]}")
-            from_val = st.selectbox("Replace this value", unique_vals, key="map_from")
-            to_val   = st.text_input("With this value", key="map_to")
-            if st.button("Apply Mapping", key="cat_map") and to_val:
+        elif cat_op == "Replace / map values":
+            st.caption("Enter old→new pairs (one per line, format: old_value=new_value)")
+            mapping_txt = st.text_area("Mapping (old=new)", key="cat_map",
+                                       placeholder="Male=M\nFemale=F\nUnknown=Other")
+            unmatched = st.checkbox("Set unmatched to 'Other'", key="cat_unmatched")
+            if st.button("Apply Mapping", key="cat_map_apply") and mapping_txt:
                 st.session_state.history.append(df.copy())
-                df[cat_col] = df[cat_col].replace({from_val: to_val})
-                st.session_state.df = df
-                st.session_state.log.append(f"Mapped '{from_val}' → '{to_val}' in '{cat_col}'")
-                st.success("Done!"); st.rerun()
+                try:
+                    mapping = {}
+                    for line in mapping_txt.strip().split("\n"):
+                        if "=" in line:
+                            k, v = line.split("=", 1)
+                            mapping[k.strip()] = v.strip()
+                    df[cat_col] = df[cat_col].map(lambda x: mapping.get(str(x), "Other" if unmatched else x))
+                    st.session_state.df = df
+                    st.session_state.log.append(f"Mapped values in '{cat_col}': {mapping}")
+                    st.success(f"✅ Applied {len(mapping)} mappings to `{cat_col}`")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error: {e}")
 
-        elif cat_op == "Group rare categories into 'Other'":
-            freq_thresh = st.slider("Group categories appearing less than N times", 1, 100, 10, key="rare_thresh")
-            counts = df[cat_col].value_counts()
-            rare = counts[counts < freq_thresh].index.tolist()
-            st.info(f"{len(rare)} rare categories will be grouped: {rare[:10]}")
-            if st.button("Apply Rare Grouping", key="cat_rare"):
+        elif cat_op == "Group rare categories → Other":
+            threshold = st.slider("Min frequency threshold (%)", 1, 20, 5, key="cat_rare_thr")
+            freq = df[cat_col].value_counts(normalize=True) * 100
+            rare = freq[freq < threshold].index.tolist()
+            st.info(f"Categories below {threshold}%: {rare[:10]}")
+            if st.button("Group Rare → Other", key="cat_rare_apply"):
                 st.session_state.history.append(df.copy())
-                df[cat_col] = df[cat_col].apply(lambda x: "Other" if x in rare else x)
+                df[cat_col] = df[cat_col].apply(lambda x: x if x not in rare else "Other")
                 st.session_state.df = df
-                st.session_state.log.append(f"Grouped {len(rare)} rare categories in '{cat_col}' into 'Other'")
-                st.success("Done!"); st.rerun()
+                st.session_state.log.append(f"Grouped {len(rare)} rare categories in '{cat_col}' → Other")
+                st.success(f"✅ Grouped {len(rare)} rare categories into 'Other'")
+                st.rerun()
 
-        elif cat_op == "One-hot encoding":
-            st.info(f"Will create binary columns for each unique value in `{cat_col}`.")
-            drop_orig = st.checkbox("Drop original column after encoding", value=True, key="ohe_drop")
-            if st.button("Apply One-Hot Encoding", key="cat_ohe"):
+        elif cat_op == "One-hot encode":
+            st.info(f"Will create {df[cat_col].nunique()} new binary columns and drop `{cat_col}`")
+            if st.button("Apply One-Hot Encoding", key="cat_ohe_apply"):
                 st.session_state.history.append(df.copy())
-                dummies = pd.get_dummies(df[cat_col], prefix=cat_col, dtype=int)
-                df = pd.concat([df, dummies], axis=1)
-                if drop_orig: df = df.drop(columns=[cat_col])
+                dummies = pd.get_dummies(df[cat_col], prefix=cat_col, drop_first=False)
+                df = pd.concat([df.drop(columns=[cat_col]), dummies], axis=1)
                 st.session_state.df = df
-                st.session_state.log.append(f"One-hot encoded '{cat_col}' — {len(dummies.columns)} new columns")
-                st.success(f"Created {len(dummies.columns)} new columns!"); st.rerun()
+                st.session_state.log.append(f"One-hot encoded '{cat_col}' → {dummies.shape[1]} columns")
+                st.success(f"✅ One-hot encoded `{cat_col}` into {dummies.shape[1]} columns")
+                st.rerun()
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 4. OUTLIER DETECTION & TREATMENT
+# 5. NUMERIC CLEANING (Outliers)
 # ═══════════════════════════════════════════════════════════════════════════════
-with st.expander("📦 4. Outlier Detection & Treatment", expanded=False):
+with st.expander("📐 5. Numeric Cleaning & Outliers", expanded=False):
     num_cols = df.select_dtypes(include=np.number).columns.tolist()
     if not num_cols:
         st.info("No numeric columns.")
     else:
-        out_col    = st.selectbox("Column", num_cols, key="out_col")
-        out_method = st.radio("Detection method", ["IQR (1.5×)", "Z-score (threshold 3)"], horizontal=True, key="out_method")
-        series     = df[out_col].dropna()
-
-        if out_method == "IQR (1.5×)":
-            Q1, Q3 = series.quantile(0.25), series.quantile(0.75)
+        nc = st.selectbox("Column", num_cols, key="nc_col")
+        method_out = st.radio("Detection method", ["IQR (1.5×)", "Z-score (threshold)"],
+                              horizontal=True, key="nc_method")
+        s = df[nc].dropna()
+        if method_out == "IQR (1.5×)":
+            Q1, Q3 = s.quantile(0.25), s.quantile(0.75)
             IQR = Q3 - Q1
-            mask = (df[out_col] < Q1 - 1.5*IQR) | (df[out_col] > Q3 + 1.5*IQR)
-            lower, upper = Q1 - 1.5*IQR, Q3 + 1.5*IQR
+            mask_out = (s < Q1 - 1.5*IQR) | (s > Q3 + 1.5*IQR)
         else:
-            z = (df[out_col] - series.mean()) / series.std()
-            mask = z.abs() > 3
-            lower, upper = series.mean() - 3*series.std(), series.mean() + 3*series.std()
+            z_thr = st.slider("Z-score threshold", 2.0, 4.0, 3.0, 0.1, key="nc_zthr")
+            z = np.abs((s - s.mean()) / s.std())
+            mask_out = z > z_thr
 
-        n_out = int(mask.sum())
+        n_out = int(mask_out.sum())
         st.metric("Outliers detected", n_out)
-        st.caption(f"Valid range: {lower:.2f} → {upper:.2f}")
+        if n_out > 0:
+            st.dataframe(df.loc[mask_out.index[mask_out], [nc]].describe().T, use_container_width=True)
 
-        action = st.selectbox("Action", [
-            "Do nothing (just view)",
-            "Remove outlier rows",
-            "Cap (winsorize) to boundary values"
-        ], key="out_action")
+        action_out = st.radio("Action", ["Do nothing", "Remove outlier rows", "Cap / Winsorize"],
+                              horizontal=True, key="nc_action")
 
-        if st.button("Apply Outlier Action", key="out_apply"):
+        if action_out == "Cap / Winsorize":
+            lo_q = st.slider("Lower quantile cap", 0.0, 0.1, 0.01, 0.005, key="nc_loq")
+            hi_q = st.slider("Upper quantile cap", 0.9, 1.0, 0.99, 0.005, key="nc_hiq")
+
+        if action_out != "Do nothing" and st.button("Apply Outlier Action", key="nc_apply"):
             st.session_state.history.append(df.copy())
-            if action == "Remove outlier rows":
-                df = df[~mask]
-                st.session_state.df = df
-                st.session_state.log.append(f"Removed {n_out} outlier rows from '{out_col}'")
-                st.success(f"Removed {n_out} rows."); st.rerun()
-            elif action == "Cap (winsorize) to boundary values":
-                df[out_col] = df[out_col].clip(lower=lower, upper=upper)
-                st.session_state.df = df
-                st.session_state.log.append(f"Winsorized '{out_col}' to [{lower:.2f}, {upper:.2f}]")
-                st.success(f"Capped {n_out} values."); st.rerun()
-            else:
-                st.info("No changes made.")
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 5. SCALING / NORMALIZATION
-# ═══════════════════════════════════════════════════════════════════════════════
-with st.expander("📐 5. Scaling & Normalization", expanded=False):
-    num_cols = df.select_dtypes(include=np.number).columns.tolist()
-    if not num_cols:
-        st.info("No numeric columns.")
-    else:
-        scale_cols   = st.multiselect("Columns to scale", num_cols, key="scale_cols")
-        scale_method = st.selectbox("Method", ["Min-Max (0–1)", "Z-score standardization"], key="scale_method")
-
-        if scale_cols:
-            st.write("**Before:**")
-            st.dataframe(df[scale_cols].describe().T[["mean","std","min","max"]], use_container_width=True)
-
-        if st.button("Apply Scaling", key="scale_apply") and scale_cols:
-            st.session_state.history.append(df.copy())
-            for c in scale_cols:
-                if scale_method == "Min-Max (0–1)":
-                    mn, mx = df[c].min(), df[c].max()
-                    df[c] = (df[c] - mn) / (mx - mn) if mx != mn else 0
-                else:
-                    df[c] = (df[c] - df[c].mean()) / df[c].std()
+            before = len(df)
+            if action_out == "Remove outlier rows":
+                full_mask = (df[nc] < (Q1 - 1.5*IQR)) | (df[nc] > (Q3 + 1.5*IQR)) if method_out == "IQR (1.5×)" else (np.abs((df[nc] - df[nc].mean()) / df[nc].std()) > z_thr)
+                df = df[~full_mask]
+                removed = before - len(df)
+                st.session_state.log.append(f"Removed {removed} outlier rows from '{nc}'")
+                st.success(f"✅ Removed {removed} rows with outliers in `{nc}`")
+            elif action_out == "Cap / Winsorize":
+                lo_val = df[nc].quantile(lo_q)
+                hi_val = df[nc].quantile(hi_q)
+                df[nc] = df[nc].clip(lower=lo_val, upper=hi_val)
+                st.session_state.log.append(f"Winsorized '{nc}' at [{lo_q:.3f}, {hi_q:.3f}] quantiles")
+                st.success(f"✅ Capped `{nc}` at [{lo_val:.3g}, {hi_val:.3g}]")
             st.session_state.df = df
-            st.session_state.log.append(f"Scaled {scale_cols} using {scale_method}")
-            st.success("Scaling applied!")
-            st.write("**After:**")
-            st.dataframe(df[scale_cols].describe().T[["mean","std","min","max"]], use_container_width=True)
             st.rerun()
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 6. COLUMN OPERATIONS
+# 6. NORMALIZATION / SCALING
 # ═══════════════════════════════════════════════════════════════════════════════
-with st.expander("🔧 6. Column Operations", expanded=False):
-    col_op = st.selectbox("Operation", [
-        "Rename column",
-        "Drop column(s)",
-        "Change column type",
-        "Create new column (formula)",
-        "Bin numeric column into categories"
-    ], key="col_op")
+with st.expander("📏 6. Normalization & Scaling", expanded=False):
+    num_cols_sc = df.select_dtypes(include=np.number).columns.tolist()
+    if not num_cols_sc:
+        st.info("No numeric columns.")
+    else:
+        sc_cols = st.multiselect("Columns to scale", num_cols_sc,
+                                  default=num_cols_sc[:min(3,len(num_cols_sc))], key="sc_cols")
+        sc_method = st.radio("Method", ["Min-Max (0–1)", "Z-score (mean=0, std=1)"],
+                             horizontal=True, key="sc_method")
+
+        if sc_cols:
+            before_stats = df[sc_cols].describe().T[["mean","std","min","max"]]
+            st.write("**Before:**")
+            st.dataframe(before_stats, use_container_width=True)
+
+        if sc_cols and st.button("Apply Scaling", key="sc_apply"):
+            st.session_state.history.append(df.copy())
+            for c in sc_cols:
+                if sc_method == "Min-Max (0–1)":
+                    mn, mx = df[c].min(), df[c].max()
+                    if mx != mn: df[c] = (df[c] - mn) / (mx - mn)
+                else:
+                    mu, sig = df[c].mean(), df[c].std()
+                    if sig != 0: df[c] = (df[c] - mu) / sig
+            after_stats = df[sc_cols].describe().T[["mean","std","min","max"]]
+            st.write("**After:**")
+            st.dataframe(after_stats, use_container_width=True)
+            st.session_state.df = df
+            st.session_state.log.append(f"Scaled columns {sc_cols} using {sc_method}")
+            st.success(f"✅ Scaled {len(sc_cols)} columns using {sc_method}")
+            st.rerun()
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 7. COLUMN OPERATIONS
+# ═══════════════════════════════════════════════════════════════════════════════
+with st.expander("⚙️ 7. Column Operations", expanded=False):
+    col_op = st.radio("Operation", ["Rename column", "Drop columns",
+                                     "Create new column (formula)", "Bin numeric column"],
+                       key="colop")
 
     if col_op == "Rename column":
-        old = st.selectbox("Column to rename", df.columns.tolist(), key="ren_old")
-        new = st.text_input("New name", key="ren_new")
-        if st.button("Rename", key="ren_apply") and new:
+        old_name = st.selectbox("Column to rename", df.columns.tolist(), key="ren_col")
+        new_name = st.text_input("New name", key="ren_new")
+        if st.button("Rename", key="ren_apply") and new_name:
             st.session_state.history.append(df.copy())
-            df = df.rename(columns={old: new})
+            df = df.rename(columns={old_name: new_name})
             st.session_state.df = df
-            st.session_state.log.append(f"Renamed '{old}' → '{new}'")
-            st.success("Done!"); st.rerun()
+            st.session_state.log.append(f"Renamed '{old_name}' → '{new_name}'")
+            st.success(f"✅ Renamed `{old_name}` → `{new_name}`")
+            st.rerun()
 
-    elif col_op == "Drop column(s)":
+    elif col_op == "Drop columns":
         drop_cols = st.multiselect("Columns to drop", df.columns.tolist(), key="drop_cols")
-        if st.button("Drop", key="drop_apply") and drop_cols:
+        if drop_cols and st.button("Drop Selected Columns", key="drop_apply"):
             st.session_state.history.append(df.copy())
             df = df.drop(columns=drop_cols)
             st.session_state.df = df
             st.session_state.log.append(f"Dropped columns: {drop_cols}")
-            st.success("Done!"); st.rerun()
-
-    elif col_op == "Change column type":
-        type_col  = st.selectbox("Column", df.columns.tolist(), key="type_col")
-        tgt_type  = st.selectbox("Convert to", ["numeric", "string", "datetime", "category"], key="tgt_type")
-        if st.button("Convert", key="type_apply"):
-            st.session_state.history.append(df.copy())
-            try:
-                if tgt_type == "numeric":  df[type_col] = pd.to_numeric(df[type_col], errors="coerce")
-                elif tgt_type == "string": df[type_col] = df[type_col].astype(str)
-                elif tgt_type == "datetime": df[type_col] = pd.to_datetime(df[type_col], errors="coerce")
-                elif tgt_type == "category": df[type_col] = df[type_col].astype("category")
-                st.session_state.df = df
-                st.session_state.log.append(f"Converted '{type_col}' to {tgt_type}")
-                st.success("Done!"); st.rerun()
-            except Exception as e:
-                st.error(f"Error: {e}")
+            st.success(f"✅ Dropped {len(drop_cols)} column(s)")
+            st.rerun()
 
     elif col_op == "Create new column (formula)":
-        st.caption("Use column names as variables. Examples: `salary / age`, `log(salary)`, `salary - salary.mean()`")
-        new_col_name = st.text_input("New column name", key="new_col_name")
-        formula      = st.text_input("Formula (use column names directly)", key="formula")
-        if st.button("Create Column", key="new_col_apply") and new_col_name and formula:
+        new_col_name = st.text_input("New column name", key="newcol_name")
+        st.caption("Available column names: " + ", ".join([f"`{c}`" for c in df.columns[:10]]))
+        formula = st.text_input("Formula (use df['colname'] syntax)",
+                                placeholder="df['price'] / df['quantity']", key="newcol_formula")
+        if st.button("Create Column", key="newcol_apply") and new_col_name and formula:
             st.session_state.history.append(df.copy())
             try:
-                local_vars = {c: df[c] for c in df.columns}
                 import math
-                local_vars.update({"log": np.log, "sqrt": np.sqrt, "abs": np.abs,
-                                   "exp": np.exp, "mean": np.mean})
-                df[new_col_name] = eval(formula, {"__builtins__": {}}, local_vars)
+                df[new_col_name] = eval(formula, {"df": df, "np": np, "pd": pd, "math": math})
                 st.session_state.df = df
                 st.session_state.log.append(f"Created column '{new_col_name}' = {formula}")
-                st.success(f"Column '{new_col_name}' created!"); st.rerun()
+                st.success(f"✅ Created column `{new_col_name}`")
+                st.rerun()
             except Exception as e:
                 st.error(f"Formula error: {e}")
 
-    elif col_op == "Bin numeric column into categories":
+    elif col_op == "Bin numeric column":
         num_cols_bin = df.select_dtypes(include=np.number).columns.tolist()
-        if not num_cols_bin:
-            st.info("No numeric columns.")
-        else:
-            bin_col   = st.selectbox("Column to bin", num_cols_bin, key="bin_col")
-            bin_n     = st.slider("Number of bins", 2, 20, 5, key="bin_n")
-            bin_strat = st.radio("Strategy", ["Equal-width bins", "Quantile bins (equal-frequency)"],
-                                 horizontal=True, key="bin_strat")
-            bin_labels = st.text_input("Custom labels (comma-separated, optional)", key="bin_labels")
-            new_bin_col = st.text_input("New column name", value=f"{bin_col}_binned", key="bin_new_col")
-
-            if st.button("Apply Binning", key="bin_apply"):
+        if num_cols_bin:
+            bin_col  = st.selectbox("Column to bin", num_cols_bin, key="bin_col")
+            bin_n    = st.slider("Number of bins", 2, 20, 5, key="bin_n")
+            bin_meth = st.radio("Binning method", ["Equal-width", "Quantile (equal-frequency)"],
+                                horizontal=True, key="bin_meth")
+            bin_name = st.text_input("New column name", value=f"{bin_col}_bin", key="bin_name")
+            if st.button("Create Bins", key="bin_apply"):
                 st.session_state.history.append(df.copy())
-                try:
-                    labels = [l.strip() for l in bin_labels.split(",")] if bin_labels else None
-                    if labels and len(labels) != bin_n:
-                        st.error(f"Need exactly {bin_n} labels, got {len(labels)}.")
-                    else:
-                        if bin_strat == "Equal-width bins":
-                            df[new_bin_col] = pd.cut(df[bin_col], bins=bin_n, labels=labels)
-                        else:
-                            df[new_bin_col] = pd.qcut(df[bin_col], q=bin_n, labels=labels, duplicates="drop")
-                        st.session_state.df = df
-                        st.session_state.log.append(f"Binned '{bin_col}' into '{new_bin_col}' ({bin_strat})")
-                        st.success("Done!"); st.rerun()
-                except Exception as e:
-                    st.error(f"Error: {e}")
+                if bin_meth == "Equal-width":
+                    df[bin_name] = pd.cut(df[bin_col], bins=bin_n, labels=False).astype("Int64").astype(str)
+                else:
+                    df[bin_name] = pd.qcut(df[bin_col], q=bin_n, labels=False, duplicates="drop").astype("Int64").astype(str)
+                st.session_state.df = df
+                st.session_state.log.append(f"Binned '{bin_col}' into {bin_n} {bin_meth} bins → '{bin_name}'")
+                st.success(f"✅ Created `{bin_name}` with {bin_n} bins")
+                st.rerun()
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 7. DATA VALIDATION RULES
+# 8. DATA VALIDATION RULES
 # ═══════════════════════════════════════════════════════════════════════════════
-with st.expander("✅ 7. Data Validation Rules", expanded=False):
-    val_type = st.selectbox("Validation type", [
-        "Numeric range check (min / max)",
+with st.expander("✅ 8. Data Validation Rules", expanded=False):
+    val_col = st.selectbox("Column to validate", df.columns.tolist(), key="val_col")
+    val_type = st.radio("Rule type", [
+        "Numeric range check",
         "Allowed categories list",
         "Non-null constraint"
-    ], key="val_type")
+    ], key="val_type", horizontal=True)
 
-    if val_type == "Numeric range check (min / max)":
+    violations = pd.DataFrame()
+
+    if val_type == "Numeric range check":
         num_cols_v = df.select_dtypes(include=np.number).columns.tolist()
-        if not num_cols_v:
-            st.info("No numeric columns.")
+        if val_col not in num_cols_v:
+            st.warning("Select a numeric column.")
         else:
-            val_col  = st.selectbox("Column", num_cols_v, key="val_num_col")
-            val_min  = st.number_input("Minimum allowed value", value=float(df[val_col].min()), key="val_min")
-            val_max  = st.number_input("Maximum allowed value", value=float(df[val_col].max()), key="val_max")
-            if st.button("Run Validation", key="val_num_run"):
-                violations = df[(df[val_col] < val_min) | (df[val_col] > val_max)]
-                st.metric("Violations found", len(violations))
-                if not violations.empty:
-                    st.dataframe(violations, use_container_width=True)
-                    viol_csv = violations.to_csv(index=False).encode()
-                    st.download_button("⬇️ Download violations", viol_csv, "violations.csv", mime="text/csv")
-                else:
-                    st.success("All values within range!")
+            min_val = st.number_input("Min allowed", value=float(df[val_col].min()), key="val_min")
+            max_val = st.number_input("Max allowed", value=float(df[val_col].max()), key="val_max")
+            mask = (df[val_col] < min_val) | (df[val_col] > max_val)
+            violations = df[mask]
 
     elif val_type == "Allowed categories list":
-        cat_cols_v = df.select_dtypes(include=["object","category"]).columns.tolist()
-        if not cat_cols_v:
-            st.info("No categorical columns.")
-        else:
-            val_col   = st.selectbox("Column", cat_cols_v, key="val_cat_col")
-            unique_v  = df[val_col].dropna().unique().tolist()
-            allowed   = st.multiselect("Allowed values", unique_v, default=unique_v, key="val_allowed")
-            if st.button("Run Validation", key="val_cat_run"):
-                violations = df[~df[val_col].isin(allowed) & df[val_col].notna()]
-                st.metric("Violations found", len(violations))
-                if not violations.empty:
-                    st.dataframe(violations, use_container_width=True)
-                else:
-                    st.success("All values are in the allowed list!")
+        allowed_txt = st.text_input("Allowed values (comma-separated)", key="val_cats",
+                                     placeholder="Yes,No,Maybe")
+        if allowed_txt:
+            allowed = [v.strip() for v in allowed_txt.split(",")]
+            violations = df[~df[val_col].astype(str).isin(allowed)]
 
     elif val_type == "Non-null constraint":
-        nn_cols = st.multiselect("Columns that must not be null", df.columns.tolist(), key="val_nn_cols")
-        if st.button("Run Validation", key="val_nn_run") and nn_cols:
-            results = {c: int(df[c].isnull().sum()) for c in nn_cols}
-            total_viol = sum(results.values())
-            st.metric("Total null violations", total_viol)
-            for c, n in results.items():
-                if n > 0:
-                    st.warning(f"`{c}`: {n} null values")
-                else:
-                    st.success(f"`{c}`: OK")
+        violations = df[df[val_col].isnull()]
 
+    if not violations.empty:
+        st.error(f"⚠️ {len(violations)} violation(s) found:")
+        st.dataframe(violations.head(50), use_container_width=True)
+        vio_csv = violations.to_csv(index=False).encode()
+        st.download_button("⬇️ Export violations CSV", vio_csv,
+                           "violations.csv", mime="text/csv", key="val_export")
+    elif val_type in ["Numeric range check","Allowed categories list","Non-null constraint"]:
+        st.success("✅ No violations found!")
+
+# ── TRANSFORMATION LOG ────────────────────────────────────────────────────────
 st.markdown("---")
-st.subheader("✅ Current Dataset")
-st.dataframe(st.session_state.df.head(10), use_container_width=True)
-
-if st.session_state.log:
-    with st.expander("📝 Transformation Log"):
-        for i, s in enumerate(st.session_state.log, 1):
-            st.write(f"{i}. {s}")
+with st.expander("📋 Transformation Log", expanded=False):
+    if st.session_state.log:
+        for i, step in enumerate(st.session_state.log, 1):
+            st.write(f"{i}. {step}")
+    else:
+        st.info("No transformations applied yet.")
