@@ -1,5 +1,8 @@
 import streamlit as st
 import time
+import sys, os
+# Ensure repo root is on the path so 'utils' is always importable
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 st.set_page_config(
     page_title="DataWrangler Pro",
