@@ -1,8 +1,8 @@
 import streamlit as st
-import sys, os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import sys, os as _os
+_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+if _ROOT not in sys.path: sys.path.insert(0, _ROOT)
 from utils import apply_theme, theme_colors, plotly_layout
-
 st.session_state["_page_key"] = "3_Visualization"
 apply_theme()
 
