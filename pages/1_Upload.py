@@ -10,10 +10,6 @@ import numpy as np
 import io
 
 # ── CACHE ─────────────────────────────────────────────────────────────────────
-import sys, os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from theme import apply_theme
-apply_theme()
 
 @st.cache_data
 def load_csv(b, name): return pd.read_csv(io.BytesIO(b))
