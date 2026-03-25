@@ -1,141 +1,215 @@
 import streamlit as st
-import sys, os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils import apply_theme
-st.session_state["_page_key"] = "1_Upload"
-apply_theme()
+import time
 
-import pandas as pd
-import numpy as np
-import io
-
-# ── CACHE ─────────────────────────────────────────────────────────────────────
-import sys, os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from theme import apply_theme
-apply_theme()
-
-@st.cache_data
-def load_csv(b, name): return pd.read_csv(io.BytesIO(b))
-@st.cache_data
-def load_excel(b, name): return pd.read_excel(io.BytesIO(b))
-@st.cache_data
-def load_json(b, name): return pd.read_json(io.BytesIO(b))
-@st.cache_data
-def load_sheets(url): return pd.read_csv(url)
+st.set_page_config(
+    page_title="DataWrangler Pro",
+    page_icon="🔬",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 # ── SESSION INIT ──────────────────────────────────────────────────────────────
-for k, v in [("df", None), ("log", []), ("history", []), ("last_file", "")]:
-    if k not in st.session_state:
-        st.session_state[k] = v
+if "intro_done" not in st.session_state:
+    st.session_state.intro_done = False
+if "history" not in st.session_state:
+    st.session_state.history = []
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = False
 
-# ── HEADER ────────────────────────────────────────────────────────────────────
-col_title, col_reset = st.columns([5, 1])
-with col_title:
-    st.title("📂 Upload & Data Profile")
-with col_reset:
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("🔄 Reset All", type="secondary", use_container_width=True):
-        for k in list(st.session_state.keys()):
-            del st.session_state[k]
-        st.cache_data.clear()
+# ── LIGHT MODE CSS ────────────────────────────────────────────────────────────
+LIGHT_CSS = """
+<style>
+[data-testid="stAppViewContainer"] {
+    background: linear-gradient(135deg, #e8f0fe 0%, #f0f4ff 40%, #eef2ff 70%, #e8f4f8 100%);
+    background-attachment: fixed;
+}
+[data-testid="stAppViewContainer"]::before {
+    content: "";
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image: radial-gradient(circle, #c7d7f7 1px, transparent 1px);
+    background-size: 32px 32px;
+    opacity: 0.25;
+    pointer-events: none;
+    z-index: 0;
+}
+[data-testid="stMain"] { background: transparent; }
+[data-testid="stMetric"] { background: #f8fafc; border: 0.5px solid #e2e8f0;
+    border-radius: 10px; padding: 12px 16px !important; }
+[data-testid="stMetricLabel"] { font-size: 12px !important; color: #64748b !important; }
+[data-testid="stMetricValue"] { font-size: 22px !important; font-weight: 600 !important; }
+[data-testid="stExpander"] { border: 0.5px solid #e2e8f0 !important; border-radius: 10px !important; }
+.stButton > button { border-radius: 8px; font-weight: 500; transition: all 0.15s; }
+.stButton > button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.stDownloadButton > button { background: #0f172a !important; color: white !important;
+    border: none !important; border-radius: 8px !important; }
+[data-testid="stSidebar"] { background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%); }
+[data-testid="stSidebar"] * { color: #e2e8f0 !important; }
+[data-testid="stSidebarNav"] a { border-radius: 8px; margin: 2px 0; }
+[data-testid="stSidebarNav"] a:hover { background: rgba(255,255,255,0.08) !important; }
+</style>
+"""
+
+# ── DARK MODE CSS ─────────────────────────────────────────────────────────────
+DARK_CSS = """
+<style>
+[data-testid="stAppViewContainer"] {
+    background: linear-gradient(135deg, #0a0f1e 0%, #0f172a 50%, #0d1526 100%) !important;
+    background-attachment: fixed;
+}
+[data-testid="stAppViewContainer"]::before {
+    content: "";
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image: radial-gradient(circle, #1e3a5f 1px, transparent 1px);
+    background-size: 32px 32px;
+    opacity: 0.35;
+    pointer-events: none;
+    z-index: 0;
+}
+[data-testid="stMain"] { background: transparent !important; }
+h1, h2, h3, h4, h5, p { color: #e2e8f0 !important; }
+[data-testid="stMetric"] { background: #1e293b !important; border: 0.5px solid #334155 !important;
+    border-radius: 10px; padding: 12px 16px !important; }
+[data-testid="stMetricLabel"] { font-size: 12px !important; color: #94a3b8 !important; }
+[data-testid="stMetricValue"] { font-size: 22px !important; font-weight: 600 !important; color: #f1f5f9 !important; }
+[data-testid="stExpander"] { border: 0.5px solid #334155 !important; border-radius: 10px !important;
+    background: #1e293b !important; }
+.stButton > button { border-radius: 8px; font-weight: 500; transition: all 0.15s; }
+.stButton > button:hover { transform: translateY(-1px); }
+.stDownloadButton > button { background: #3b82f6 !important; color: white !important;
+    border: none !important; border-radius: 8px !important; }
+[data-testid="stSidebar"] { background: linear-gradient(180deg, #020617 0%, #0a0f1e 100%) !important; }
+[data-testid="stSidebar"] * { color: #e2e8f0 !important; }
+[data-testid="stSidebarNav"] a { border-radius: 8px; margin: 2px 0; }
+[data-testid="stSidebarNav"] a:hover { background: rgba(255,255,255,0.08) !important; }
+[data-testid="stAlert"] { background: #1e3a5f !important; }
+.stMarkdown, .stCaption { color: #94a3b8 !important; }
+[data-testid="stDataFrame"] { background: #1e293b !important; }
+</style>
+"""
+
+st.markdown(DARK_CSS if st.session_state.dark_mode else LIGHT_CSS, unsafe_allow_html=True)
+
+# ── SIDEBAR DARK MODE TOGGLE — styled to match nav link size ─────────────────
+st.markdown("""
+<style>
+[data-testid="stSidebar"] [data-testid="stButton"] > button {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: #94a3b8 !important;
+    font-size: 14px !important;
+    font-weight: 400 !important;
+    padding: 6px 12px !important;
+    height: auto !important;
+    min-height: unset !important;
+    line-height: 1.5 !important;
+    text-align: left !important;
+    justify-content: flex-start !important;
+    width: 100% !important;
+    border-radius: 6px !important;
+    margin-top: 4px !important;
+}
+[data-testid="stSidebar"] [data-testid="stButton"] > button:hover {
+    background: rgba(255,255,255,0.07) !important;
+    color: #e2e8f0 !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+with st.sidebar:
+    st.markdown("<div style='height:12px'></div>", unsafe_allow_html=True)
+    dm_label = "☀️  Light mode" if st.session_state.dark_mode else "🌙  Dark mode"
+    if st.button(dm_label, key="dm_toggle"):
+        st.session_state.dark_mode = not st.session_state.dark_mode
         st.rerun()
 
-st.markdown("---")
+# ── INTRO (once per session) ──────────────────────────────────────────────────
+if not st.session_state.intro_done:
+    st.markdown("""
+    <style>
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(16px); }
+        to   { opacity: 1; transform: translateY(0); }
+    }
+    .intro-wrap  { text-align:center; padding:5rem 2rem 3rem; animation:fadeIn 0.8s ease forwards; }
+    .intro-icon  { font-size:64px; margin-bottom:1.25rem; }
+    .intro-title { font-size:2.6rem; font-weight:700; color:#0f172a; margin-bottom:0.4rem; }
+    .intro-sub   { font-size:1.05rem; color:#64748b; margin-bottom:2.5rem; }
+    .intro-steps { display:flex; justify-content:center; gap:1.5rem; flex-wrap:wrap; margin-bottom:2rem; }
+    .intro-step  { font-size:0.9rem; color:#475569; background:rgba(255,255,255,0.75);
+                   padding:8px 18px; border-radius:20px; border:0.5px solid #cbd5e1; }
+    </style>
+    <div class="intro-wrap">
+      <div class="intro-icon">🔬</div>
+      <div class="intro-title">DataWrangler Pro</div>
+      <div class="intro-sub">Your AI-powered data preparation workspace</div>
+      <div class="intro-steps">
+        <span class="intro-step">📂 Upload</span>
+        <span class="intro-step">🧹 Clean</span>
+        <span class="intro-step">📊 Visualize</span>
+        <span class="intro-step">📤 Export</span>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-# ── GOOGLE SHEETS ─────────────────────────────────────────────────────────────
-with st.expander("🌐 Load from Google Sheets (Optional)", expanded=False):
-    st.caption("Sheet must be shared as 'Anyone with the link can view'")
-    sheet_url = st.text_input("Paste Google Sheets share link", key="gs_url")
-    if st.button("Load Google Sheets") and sheet_url:
-        try:
-            if "/edit" in sheet_url:
-                gid = sheet_url.split("gid=")[-1].split("&")[0].split("#")[0] if "gid=" in sheet_url else "0"
-                base = sheet_url.split("/edit")[0]
-                csv_url = f"{base}/export?format=csv&gid={gid}"
-            else:
-                csv_url = sheet_url
-            df = load_sheets(csv_url)
-            st.session_state.df = df
-            st.session_state.history = [df.copy()]
-            st.session_state.last_file = "google_sheets"
-            st.session_state.log = ["Loaded from Google Sheets"]
-            st.success(f"✅ Loaded {df.shape[0]:,} rows x {df.shape[1]} columns from Google Sheets")
-        except Exception as e:
-            st.error(f"Could not load sheet. Make sure it is publicly accessible. Error: {e}")
+    bar = st.progress(0, text="Initialising workspace…")
+    for pct, label in [(20, "Loading modules…"), (50, "Preparing components…"),
+                       (80, "Almost ready…"), (100, "✓ Ready")]:
+        time.sleep(0.5)
+        bar.progress(pct, text=label)
+    time.sleep(0.3)
+    bar.empty()
+    st.session_state.intro_done = True
+    st.rerun()
 
-# ── FILE UPLOAD ───────────────────────────────────────────────────────────────
-file = st.file_uploader("📁 Upload your dataset", type=["csv", "xlsx", "json"],
-                         help="CSV, Excel (.xlsx), or JSON")
+# ── LANDING ───────────────────────────────────────────────────────────────────
+title_color = "#e2e8f0" if st.session_state.dark_mode else "#0f172a"
+sub_color   = "#94a3b8" if st.session_state.dark_mode else "#64748b"
 
-if file is not None:
-    try:
-        b = file.read()
-        if file.name.endswith(".csv"):    df = load_csv(b, file.name)
-        elif file.name.endswith(".xlsx"): df = load_excel(b, file.name)
-        elif file.name.endswith(".json"): df = load_json(b, file.name)
-        else:
-            st.error("Unsupported file type"); st.stop()
-
-        if st.session_state.last_file != file.name or st.session_state.df is None:
-            st.session_state.df = df
-            st.session_state.history = [df.copy()]
-            st.session_state.last_file = file.name
-            st.session_state.log = [f"Dataset uploaded: {file.name}"]
-
-        st.success(f"✅ **{file.name}** — {df.shape[0]:,} rows x {df.shape[1]} columns")
-    except Exception as e:
-        st.error(f"Error loading file: {e}"); st.stop()
-
-if st.session_state.df is None:
-    st.info("💡 Upload a file above or try one of the sample datasets from the `sample_data/` folder.")
-    st.stop()
-
-# ── OVERVIEW ──────────────────────────────────────────────────────────────────
-df = st.session_state.df
-st.subheader("📊 Dataset Overview")
-
-total_missing = int(df.isnull().sum().sum())
-total_cells   = df.shape[0] * df.shape[1]
-missing_pct   = round(total_missing / total_cells * 100, 1) if total_cells > 0 else 0
-dupes         = int(df.duplicated().sum())
-
-m1, m2, m3, m4, m5 = st.columns(5)
-m1.metric("Rows",          f"{df.shape[0]:,}")
-m2.metric("Columns",       df.shape[1])
-m3.metric("Duplicates",    f"{dupes:,}")
-m4.metric("Missing Cells", f"{total_missing:,}")
-m5.metric("Missing %",     f"{missing_pct}%")
+st.markdown(f"""
+<div style="padding: 1rem 0 0.5rem;">
+  <h1 style="font-size:2rem; font-weight:700; margin-bottom:0.25rem; color:{title_color};">
+    🔬 DataWrangler Pro
+  </h1>
+  <p style="color:{sub_color}; font-size:1rem; margin:0;">
+    Your AI-powered data preparation & visualization workspace
+  </p>
+</div>
+""", unsafe_allow_html=True)
 
 st.markdown("---")
-st.write("### Missing Values by Column")
-mv = pd.DataFrame({
-    "Missing Count": df.isnull().sum(),
-    "Missing %": (df.isnull().sum() / len(df) * 100).round(2)
-})
-mv_f = mv[mv["Missing Count"] > 0]
-if mv_f.empty:
-    st.success("No missing values found!")
+
+if st.session_state.dark_mode:
+    cards = [
+        ("#1e3a5f", "#93c5fd", "#60a5fa", "📂", "Upload & Profile",  "CSV · Excel · JSON · Sheets"),
+        ("#14532d", "#86efac", "#4ade80", "🧹", "Clean & Prepare",   "Missing · Duplicates · Scale"),
+        ("#3b0764", "#d8b4fe", "#c084fc", "📊", "Visualize",         "8 chart types · 3D · Download"),
+        ("#431407", "#fdba74", "#fb923c", "📤", "Export",            "CSV · Excel · Report · Recipe"),
+    ]
 else:
-    st.dataframe(mv_f.style.background_gradient(cmap="Reds", subset=["Missing %"]),
-                 use_container_width=True)
+    cards = [
+        ("#eff6ff", "#1e40af", "#3b82f6", "📂", "Upload & Profile",  "CSV · Excel · JSON · Sheets"),
+        ("#f0fdf4", "#166534", "#16a34a", "🧹", "Clean & Prepare",   "Missing · Duplicates · Scale"),
+        ("#fdf4ff", "#6b21a8", "#9333ea", "📊", "Visualize",         "8 chart types · 3D · Download"),
+        ("#fff7ed", "#9a3412", "#ea580c", "📤", "Export",            "CSV · Excel · Report · Recipe"),
+    ]
 
-st.markdown("---")
-st.write("### Column Info")
-info_df = pd.DataFrame({
-    "Column":   df.columns,
-    "Type":     df.dtypes.astype(str).values,
-    "Non-Null": df.notnull().sum().values,
-    "Unique":   [df[c].nunique() for c in df.columns],
-    "Sample":   [str(df[c].dropna().iloc[0]) if not df[c].dropna().empty else "N/A" for c in df.columns]
-}).reset_index(drop=True)
-st.dataframe(info_df, use_container_width=True)
+cols = st.columns(4)
+for col, (bg, title_c, sub_c, icon, title, sub) in zip(cols, cards):
+    with col:
+        st.markdown(f"""
+        <div style="background:{bg};border-radius:12px;padding:1.25rem;
+                    border:0.5px solid {sub_c}55;">
+          <div style="font-size:28px">{icon}</div>
+          <div style="font-weight:600;margin-top:8px;color:{title_c}">{title}</div>
+          <div style="font-size:13px;color:{sub_c};margin-top:4px">{sub}</div>
+        </div>""", unsafe_allow_html=True)
 
+st.markdown("<br>", unsafe_allow_html=True)
+st.info("👈 Use the sidebar to navigate. Start with **Upload & Profile** to load your dataset.")
 st.markdown("---")
-st.write("### Summary Statistics")
-st.dataframe(df.describe(include="all").T, use_container_width=True)
-
-st.markdown("---")
-st.write("### Data Preview")
-n_rows = st.slider("Rows to preview", 5, 50, 10)
-st.dataframe(df.head(n_rows), use_container_width=True)
+st.caption("DataWrangler Pro · Coursework Project — Data Wrangling & Visualization · IDs: 00017592 & 00018555")
