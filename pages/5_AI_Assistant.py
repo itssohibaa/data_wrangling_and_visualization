@@ -105,9 +105,14 @@ if st.session_state.ai_messages and st.session_state.ai_messages[-1]["role"] == 
         with st.spinner("Thinking..."):
             try:
                 import requests
+                api_key = st.secrets.get("ANTHROPIC_API_KEY", os.environ.get("ANTHROPIC_API_KEY", ""))
                 response = requests.post(
                     "https://api.anthropic.com/v1/messages",
-                    headers={"Content-Type": "application/json"},
+                    headers={
+                        "Content-Type": "application/json",
+                        "x-api-key": api_key,
+                        "anthropic-version": "2023-06-01",
+                    },
                     json={
                         "model": "claude-sonnet-4-20250514",
                         "max_tokens": 1000,
