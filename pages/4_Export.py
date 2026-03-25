@@ -1,62 +1,113 @@
 import streamlit as st
-import sys, os as _os
-_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
-if _ROOT not in sys.path: sys.path.insert(0, _ROOT)
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils import apply_theme
-
 st.session_state["_page_key"] = "4_Export"
 apply_theme()
 
-import pandas as pd, json
+import pandas as pd
+import json
 from datetime import datetime
 from io import BytesIO
 
-for k,v in [("df",None),("log",[])]:
-    if k not in st.session_state: st.session_state[k] = v
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from theme import apply_theme
+apply_theme()
+
+for k, v in [("df", None), ("log", [])]:
+    if k not in st.session_state:
+        st.session_state[k] = v
 
 st.title("📤 Export & Report")
+
 if st.session_state.df is None:
-    st.warning("No dataset. Please upload data first."); st.stop()
+    st.warning("No dataset available. Please upload data first."); st.stop()
 
-df=st.session_state.df; log=st.session_state.log
-total_missing=int(df.isnull().sum().sum()); dupes=int(df.duplicated().sum())
+df  = st.session_state.df
+log = st.session_state.log
 
-m1,m2,m3,m4=st.columns(4)
-m1.metric("Rows",f"{df.shape[0]:,}"); m2.metric("Columns",df.shape[1])
-m3.metric("Missing Cells",f"{total_missing:,}"); m4.metric("Duplicate Rows",f"{dupes:,}")
+total_missing = int(df.isnull().sum().sum())
+dupes         = int(df.duplicated().sum())
+
+m1,m2,m3,m4 = st.columns(4)
+m1.metric("Rows",           f"{df.shape[0]:,}")
+m2.metric("Columns",        df.shape[1])
+m3.metric("Missing Cells",  f"{total_missing:,}")
+m4.metric("Duplicate Rows", f"{dupes:,}")
+
 st.dataframe(df.head(), use_container_width=True)
 st.markdown("---")
 
+# ── DOWNLOAD DATASET ──────────────────────────────────────────────────────────
 st.subheader("💾 Download Cleaned Dataset")
-filename=st.text_input("File name (no extension)","cleaned_data")
-c1,c2,c3=st.columns(3)
-with c1: st.download_button("⬇️ CSV",df.to_csv(index=False).encode(),f"{filename}.csv","text/csv")
+filename = st.text_input("File name (no extension)", "cleaned_data")
+
+c1,c2,c3 = st.columns(3)
+with c1:
+    st.download_button("⬇️ CSV", df.to_csv(index=False).encode(),
+                       f"{filename}.csv", mime="text/csv")
 with c2:
     try:
-        buf=BytesIO()
-        with pd.ExcelWriter(buf,engine="openpyxl") as w: df.to_excel(w,index=False)
-        st.download_button("⬇️ Excel (.xlsx)",buf.getvalue(),f"{filename}.xlsx",
-                           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    except: st.warning("Excel export unavailable.")
-with c3: st.download_button("⬇️ JSON",df.to_json(orient="records",indent=2),f"{filename}.json","application/json")
+        buf = BytesIO()
+        with pd.ExcelWriter(buf, engine="openpyxl") as w:
+            df.to_excel(w, index=False)
+        st.download_button("⬇️ Excel", buf.getvalue(),
+                           f"{filename}.xlsx",
+                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    except Exception:
+        st.warning("Excel export not available.")
+with c3:
+    st.download_button("⬇️ JSON", df.to_json(orient="records", indent=2),
+                       f"{filename}.json", mime="application/json")
 
 st.markdown("---")
+
+# ── TRANSFORMATION LOG ────────────────────────────────────────────────────────
 st.subheader("📝 Transformation Log")
 if log:
-    for i,s in enumerate(log,1): st.write(f"{i}. {s}")
-else: st.info("No transformations applied yet.")
+    for i, s in enumerate(log, 1):
+        st.write(f"{i}. {s}")
+else:
+    st.info("No transformations applied yet.")
 
 st.markdown("---")
+
+# ── TRANSFORMATION REPORT ─────────────────────────────────────────────────────
 st.subheader("📄 Transformation Report")
-report={"generated_at":str(datetime.now()),
-        "dataset_summary":{"rows":df.shape[0],"columns":df.shape[1],"missing_cells":total_missing,"duplicate_rows":dupes},
-        "transformation_steps":[{"step":i+1,"description":s} for i,s in enumerate(log)]}
-st.json(report,expanded=False)
-st.download_button("⬇️ Download Report (.json)",json.dumps(report,indent=2),f"{filename}_report.json","application/json")
+st.caption("Human-readable record — who, what, when. Good for documentation and grading.")
+
+summary = {"rows": df.shape[0], "columns": df.shape[1],
+           "missing_cells": total_missing, "duplicate_rows": dupes}
+report = {
+    "generated_at": str(datetime.now()),
+    "dataset_summary": summary,
+    "transformation_steps": [{"step": i+1, "description": s} for i,s in enumerate(log)]
+}
+st.json(report, expanded=False)
+st.download_button("⬇️ Download Report (.json)", json.dumps(report, indent=2),
+                   f"{filename}_report.json", mime="application/json")
 
 st.markdown("---")
+
+# ── TRANSFORMATION RECIPE ─────────────────────────────────────────────────────
 st.subheader("⚙️ Transformation Recipe")
-recipe={"recipe_version":"1.0","created_at":str(datetime.now()),
-        "steps":[{"order":i+1,"operation":s} for i,s in enumerate(log)]}
-st.json(recipe,expanded=False)
-st.download_button("⬇️ Download Recipe (.json)",json.dumps(recipe,indent=2),f"{filename}_recipe.json","application/json")
+st.caption("Machine-readable pipeline — replay the exact same steps on any new dataset.")
+
+recipe = {
+    "recipe_version": "1.0",
+    "created_at": str(datetime.now()),
+    "steps": [{"order": i+1, "operation": s} for i,s in enumerate(log)]
+}
+st.json(recipe, expanded=False)
+st.download_button("⬇️ Download Recipe (.json)", json.dumps(recipe, indent=2),
+                   f"{filename}_recipe.json", mime="application/json")
+
+with st.expander("❓ Report vs Recipe — what's the difference?"):
+    st.markdown("""
+| | **Transformation Report** | **Transformation Recipe** |
+|---|---|---|
+| **Purpose** | Documentation for humans | Reproducibility for machines |
+| **Use case** | Share with teammates / graders | Replay pipeline on a new dataset |
+| **Contains** | Steps + summary + timestamp | Structured JSON for automation |
+    """)
