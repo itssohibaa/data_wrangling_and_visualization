@@ -9,10 +9,6 @@ import pandas as pd
 import numpy as np
 import json
 
-import sys, os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from theme import apply_theme
-apply_theme()
 
 for k, v in [("df", None), ("log", []), ("history", []), ("ai_messages", [])]:
     if k not in st.session_state:
