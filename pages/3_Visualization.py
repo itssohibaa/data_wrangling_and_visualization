@@ -51,12 +51,15 @@ LAYOUT_BASE = dict(
     legend=dict(bgcolor="rgba(255,255,255,0.8)", bordercolor="#e2e8f0", borderwidth=1)
 )
 
+CHART_HEIGHT = 420  # uniform height for all dashboard charts
+
 def style_fig(fig, title="", xlab="", ylab=""):
     fig.update_layout(
         **LAYOUT_BASE,
         title=dict(text=title, x=0.02, xanchor="left"),
         xaxis_title=xlab,
         yaxis_title=ylab,
+        height=CHART_HEIGHT,
     )
     fig.update_xaxes(showgrid=True, gridcolor="#f1f5f9", zeroline=False)
     fig.update_yaxes(showgrid=True, gridcolor="#f1f5f9", zeroline=False)
@@ -79,14 +82,7 @@ def chart_download(fig, key):
             "height": 700, "width": 1400, "scale": 2
         }}
     )
-    st.download_button(
-        "⬇️ Download chart (PNG via browser)",
-        html_str.encode(),
-        file_name=f"chart_{key}.html",
-        mime="text/html",
-        key=f"dl_{key}",
-        help="Opens in browser — use the 📷 camera icon (top right of chart) to save as PNG"
-    )
+    st.caption("💡 Hover over the chart and click the **📷 camera icon** (top-right) to save as PNG.")
 
 # ── FILTERS ───────────────────────────────────────────────────────────────────
 with st.expander("🔎 Filters", expanded=False):
@@ -130,7 +126,7 @@ with r1c1:
                                color_discrete_sequence=[THEME_COLORS[0]],
                                labels={g1c: g1c, "count": "Frequency"})
             fig = style_fig(fig, f"Distribution of {g1c}", g1c, "Frequency")
-            st.plotly_chart(fig, key="g1")
+            st.plotly_chart(fig, use_container_width=True, key="g1")
             chart_download(fig, "g1")
 
 with r1c2:
@@ -149,7 +145,7 @@ with r1c2:
             fig = style_fig(fig, f"{g2agg.capitalize()} of {g2num} by {g2cat} (Top {g2n})",
                             g2cat.replace("_"," "), f"{g2agg.capitalize()} of {g2num}")
             fig.update_layout(showlegend=False)
-            st.plotly_chart(fig, key="g2")
+            st.plotly_chart(fig, use_container_width=True, key="g2")
             chart_download(fig, "g2")
 
 with r2c1:
@@ -160,11 +156,22 @@ with r2c1:
             g3y   = st.selectbox("Y-axis", numeric_cols, index=min(1, len(numeric_cols)-1), key="g3y")
             g3col = st.selectbox("Color by", ["(none)"] + categorical_cols, key="g3col")
             ca    = g3col if g3col != "(none)" else None
-            fig   = px.scatter(df, x=g3x, y=g3y, color=ca,
+            # Compute per-point opacity: darker where data overlaps
+            _scatter_df = df[[g3x, g3y] + ([g3col] if ca else [])].dropna().copy()
+            _scatter_df["_density"] = (
+                _scatter_df.groupby([
+                    pd.cut(_scatter_df[g3x], bins=40, labels=False),
+                    pd.cut(_scatter_df[g3y], bins=40, labels=False)
+                ])[g3x].transform("count")
+            )
+            _max_d = _scatter_df["_density"].max() if _scatter_df["_density"].max() > 0 else 1
+            _scatter_df["_opacity"] = (0.25 + 0.7 * (_scatter_df["_density"] / _max_d)).clip(0.25, 0.95)
+            fig   = px.scatter(_scatter_df, x=g3x, y=g3y, color=ca,
                                color_discrete_sequence=THEME_COLORS,
+                               opacity=0.65,
                                labels={g3x: g3x.replace("_"," "), g3y: g3y.replace("_"," ")})
             fig = style_fig(fig, f"{g3y} vs {g3x}", g3x.replace("_"," "), g3y.replace("_"," "))
-            st.plotly_chart(fig, key="g3")
+            st.plotly_chart(fig, use_container_width=True, key="g3")
             chart_download(fig, "g3")
 
 with r2c2:
@@ -172,11 +179,20 @@ with r2c2:
         st.markdown("**Correlation Heatmap**")
         if len(numeric_cols) >= 2:
             corr = df[numeric_cols].corr()
+            n    = len(numeric_cols)
+            hm_h = max(CHART_HEIGHT, n * 38 + 80)
             fig  = px.imshow(corr, color_continuous_scale="RdBu_r", text_auto=".2f",
-                             labels=dict(color="Correlation"))
-            fig = style_fig(fig, "Correlation Matrix")
-            fig.update_layout(xaxis_title="", yaxis_title="")
-            st.plotly_chart(fig, key="g4")
+                             aspect="equal", labels=dict(color="r"))
+            fig.update_layout(
+                **LAYOUT_BASE,
+                title=dict(text="Correlation Matrix", x=0.02, xanchor="left"),
+                xaxis_title="", yaxis_title="",
+                height=hm_h,
+                coloraxis_colorbar=dict(len=0.6, thickness=12, title="r"),
+            )
+            fig.update_xaxes(tickangle=-35, tickfont=dict(size=11))
+            fig.update_yaxes(tickfont=dict(size=11))
+            st.plotly_chart(fig, use_container_width=True, key="g4")
             chart_download(fig, "g4")
 
 with r3c1:
@@ -193,7 +209,7 @@ with r3c1:
             fig = style_fig(fig, f"Box Plot of {g5y}" + (f" by {g5x}" if xa else ""),
                             xtitle, g5y.replace("_"," "))
             fig.update_layout(showlegend=False)
-            st.plotly_chart(fig, key="g5")
+            st.plotly_chart(fig, use_container_width=True, key="g5")
             chart_download(fig, "g5")
 
 with r3c2:
@@ -212,7 +228,7 @@ with r3c2:
                               color_discrete_sequence=THEME_COLORS,
                               labels={g6x: g6x.replace("_"," "), g6y: g6y.replace("_"," ")})
                 fig = style_fig(fig, f"{g6y} over {g6x}", g6x.replace("_"," "), g6y.replace("_"," "))
-                st.plotly_chart(fig, key="g6")
+                st.plotly_chart(fig, use_container_width=True, key="g6")
                 chart_download(fig, "g6")
             except Exception as e:
                 st.warning(f"Could not render line chart: {e}")
@@ -266,8 +282,16 @@ elif chart_type == "Scatter Plot":
     colby = c3.selectbox("Color by", ["(none)"] + categorical_cols, key="sc_col")
     trend = c4.checkbox("Trendline (OLS)", key="sc_trend")
     ca    = colby if colby != "(none)" else None
-    fig   = px.scatter(df, x=xc, y=yc, color=ca, color_discrete_sequence=THEME_COLORS,
+    _sc_df = df[[xc, yc] + ([colby] if ca else [])].dropna().copy()
+    _sc_df["_density"] = (
+        _sc_df.groupby([
+            pd.cut(_sc_df[xc], bins=40, labels=False),
+            pd.cut(_sc_df[yc], bins=40, labels=False)
+        ])[xc].transform("count")
+    )
+    fig   = px.scatter(_sc_df, x=xc, y=yc, color=ca, color_discrete_sequence=THEME_COLORS,
                        trendline="ols" if (trend and not ca) else None,
+                       opacity=0.65,
                        labels={xc: xc.replace("_"," "), yc: yc.replace("_"," ")})
     fig = style_fig(fig, f"Relationship: {yc} vs {xc}", xc.replace("_"," "), yc.replace("_"," "))
 
@@ -306,10 +330,19 @@ elif chart_type == "Correlation Heatmap":
                                default=numeric_cols[:min(10,len(numeric_cols))], key="hm_cols")
     if len(sel_cols) >= 2:
         corr = df[sel_cols].corr()
+        n_hm = len(sel_cols)
+        hm_h_custom = max(500, n_hm * 42 + 80)
         fig  = px.imshow(corr, color_continuous_scale="RdBu_r", text_auto=".2f",
-                         aspect="auto", labels=dict(color="Correlation"))
-        fig = style_fig(fig, "Correlation Matrix")
-        fig.update_layout(xaxis_title="", yaxis_title="")
+                         aspect="equal", labels=dict(color="r"))
+        fig.update_layout(
+            **LAYOUT_BASE,
+            title=dict(text="Correlation Matrix", x=0.02, xanchor="left"),
+            xaxis_title="", yaxis_title="",
+            height=hm_h_custom,
+            coloraxis_colorbar=dict(len=0.6, thickness=12, title="r"),
+        )
+        fig.update_xaxes(tickangle=-35, tickfont=dict(size=11))
+        fig.update_yaxes(tickfont=dict(size=11))
 
 elif chart_type == "3D Scatter Plot":
     if len(numeric_cols) < 3: st.warning("Need ≥3 numeric columns for 3D."); st.stop()
@@ -356,8 +389,67 @@ elif chart_type == "Pie / Donut Chart":
                       legend_title=cat.replace("_"," "))
 
 if fig is not None:
-    st.plotly_chart(fig, key="custom_chart")
+    st.plotly_chart(fig, use_container_width=True, key="custom_chart")
     chart_download(fig, "custom")
+
+st.markdown("---")
+
+# ════════════════════════════════════════════════════════════════════════════════
+# MAP VISUALIZATION (auto-detected or manual)
+# ════════════════════════════════════════════════════════════════════════════════
+# Detect likely lat/lon columns
+_lat_candidates = [c for c in df.columns if any(k in c.lower() for k in ["lat", "latitude"])]
+_lon_candidates = [c for c in df.columns if any(k in c.lower() for k in ["lon", "lng", "longitude"])]
+_has_coords = len(_lat_candidates) > 0 and len(_lon_candidates) > 0
+
+map_header = "🗺️ Map Visualization" + (" *(coordinate columns detected)*" if _has_coords else "")
+with st.expander(map_header, expanded=_has_coords):
+    _map_num_cols = df.select_dtypes(include=np.number).columns.tolist()
+    if len(_map_num_cols) < 2:
+        st.info("No numeric columns available for mapping.")
+    else:
+        mc1, mc2, mc3, mc4 = st.columns(4)
+        lat_col  = mc1.selectbox("Latitude column",  _map_num_cols,
+                                  index=_map_num_cols.index(_lat_candidates[0]) if _lat_candidates else 0,
+                                  key="map_lat")
+        lon_col  = mc2.selectbox("Longitude column", _map_num_cols,
+                                  index=_map_num_cols.index(_lon_candidates[0]) if _lon_candidates else min(1,len(_map_num_cols)-1),
+                                  key="map_lon")
+        size_col = mc3.selectbox("Size by (optional)", ["(none)"] + _map_num_cols, key="map_size")
+        color_col= mc4.selectbox("Color by (optional)", ["(none)"] + categorical_cols + _map_num_cols, key="map_color")
+
+        map_df = df[[lat_col, lon_col] +
+                    ([size_col] if size_col != "(none)" else []) +
+                    ([color_col] if color_col != "(none)" else [])
+                   ].dropna()
+
+        if map_df.empty:
+            st.warning("No rows with valid coordinates after dropping nulls.")
+        else:
+            _lat_range = map_df[lat_col].between(-90, 90)
+            _lon_range = map_df[lon_col].between(-180, 180)
+            map_df = map_df[_lat_range & _lon_range]
+            if map_df.empty:
+                st.warning("No rows with coordinates in valid geographic range (lat ±90, lon ±180).")
+            else:
+                st.caption(f"Plotting {len(map_df):,} points on the map.")
+                _sz  = size_col  if size_col  != "(none)" else None
+                _col = color_col if color_col != "(none)" else None
+                map_fig = px.scatter_mapbox(
+                    map_df, lat=lat_col, lon=lon_col,
+                    size=_sz, color=_col,
+                    color_discrete_sequence=THEME_COLORS,
+                    size_max=18, zoom=2, opacity=0.7,
+                    mapbox_style="carto-positron",
+                    labels={lat_col: "Lat", lon_col: "Lon"},
+                    height=520,
+                )
+                map_fig.update_layout(
+                    margin=dict(t=30, b=0, l=0, r=0),
+                    paper_bgcolor="rgba(0,0,0,0)",
+                )
+                st.plotly_chart(map_fig, use_container_width=True, key="map_chart")
+                chart_download(map_fig, "map")
 
 st.markdown("---")
 
