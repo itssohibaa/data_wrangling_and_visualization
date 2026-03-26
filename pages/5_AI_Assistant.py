@@ -15,7 +15,6 @@ for k, v in [("df", None), ("log", []), ("history", []), ("ai_messages", [])]:
         st.session_state[k] = v
 
 st.title("🤖 AI Assistant")
-st.caption("Powered by Claude — get smart suggestions on cleaning and visualization.")
 
 if st.session_state.df is None:
     st.warning("Please upload a dataset first."); st.stop()
@@ -105,7 +104,23 @@ if st.session_state.ai_messages and st.session_state.ai_messages[-1]["role"] == 
         with st.spinner("Thinking..."):
             try:
                 import requests
-                api_key = st.secrets.get("ANTHROPIC_API_KEY", os.environ.get("ANTHROPIC_API_KEY", ""))
+                # Try multiple secret locations
+                api_key = ""
+                try:
+                    api_key = st.secrets["ANTHROPIC_API_KEY"]
+                except Exception:
+                    pass
+                if not api_key:
+                    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+
+                if not api_key:
+                    st.error(
+                        "⚠️ API key not configured. Add `ANTHROPIC_API_KEY` to your Streamlit secrets "
+                        "(`streamlit/secrets.toml`) or as an environment variable, then restart the app."
+                    )
+                    st.session_state.ai_messages.pop()
+                    st.stop()
+
                 response = requests.post(
                     "https://api.anthropic.com/v1/messages",
                     headers={
@@ -156,7 +171,16 @@ if st.session_state.ai_messages and st.session_state.ai_messages[-1]["role"] == 
 
 # Chat input for free-form questions
 if mode == "💬 Free chat":
-    user_input = st.chat_input("Ask anything about your data...")
+    _examples = [
+        "Which columns have the most missing data?",
+        "What chart would best show revenue trends over time?",
+        "Are there any outliers I should handle?",
+        "What correlations are worth investigating?",
+        "How should I handle the categorical columns?",
+    ]
+    import random as _random
+    _placeholder = _random.choice(_examples)
+    user_input = st.chat_input(f"Ask anything about your data… e.g. '{_placeholder}'")
     if user_input:
         st.session_state.ai_messages.append({"role": "user", "content": user_input})
         st.rerun()
