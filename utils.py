@@ -19,12 +19,34 @@ LIGHT_CSS = """
     z-index: 0;
 }
 [data-testid="stMain"] { background: transparent; }
+/* ── Force readable dark text throughout light mode ── */
+[data-testid="stMain"] h1,
+[data-testid="stMain"] h2,
+[data-testid="stMain"] h3,
+[data-testid="stMain"] h4,
+[data-testid="stMain"] h5,
+[data-testid="stMain"] h6,
+[data-testid="stMain"] p,
+[data-testid="stMain"] label,
+[data-testid="stMain"] span,
+[data-testid="stMain"] div,
+[data-testid="stMain"] .stMarkdown,
+[data-testid="stMain"] .stCaption,
+[data-testid="stMain"] .stText,
+[data-testid="stMain"] [data-testid="stCaptionContainer"],
+[data-testid="stMain"] [class*="caption"],
+[data-testid="stMain"] [data-testid="stWidgetLabel"] { color: #1e293b !important; }
+[data-testid="stMain"] .stCaption,
+[data-testid="stMain"] caption,
+[data-testid="stMain"] small { color: #475569 !important; }
 [data-testid="stMetric"] { background: #f8fafc; border: 0.5px solid #e2e8f0;
     border-radius: 10px; padding: 12px 16px !important; }
 [data-testid="stMetricLabel"] { font-size: 12px !important; color: #64748b !important; }
-[data-testid="stMetricValue"] { font-size: 22px !important; font-weight: 600 !important; }
-[data-testid="stExpander"] { border: 0.5px solid #e2e8f0 !important; border-radius: 10px !important; }
-.stButton > button { border-radius: 8px; font-weight: 500; transition: all 0.15s; }
+[data-testid="stMetricValue"] { font-size: 22px !important; font-weight: 600 !important; color: #0f172a !important; }
+[data-testid="stExpander"] { border: 0.5px solid #e2e8f0 !important; border-radius: 10px !important;
+    background: rgba(255,255,255,0.6) !important; }
+[data-testid="stExpander"] summary { color: #1e293b !important; }
+.stButton > button { border-radius: 8px; font-weight: 500; transition: all 0.15s; color: #1e293b !important; }
 .stButton > button:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
 .stDownloadButton > button { background: #0f172a !important; color: white !important;
     border: none !important; border-radius: 8px !important; }
@@ -32,6 +54,15 @@ LIGHT_CSS = """
 [data-testid="stSidebar"] * { color: #e2e8f0 !important; }
 [data-testid="stSidebarNav"] a { border-radius: 8px; margin: 2px 0; }
 [data-testid="stSidebarNav"] a:hover { background: rgba(255,255,255,0.08) !important; }
+/* Tabs, radios, selects */
+[data-testid="stMain"] [data-testid="stSelectbox"] label,
+[data-testid="stMain"] [data-testid="stMultiSelect"] label,
+[data-testid="stMain"] [data-testid="stRadio"] label,
+[data-testid="stMain"] [data-testid="stCheckbox"] label,
+[data-testid="stMain"] [data-testid="stSlider"] label { color: #1e293b !important; }
+[data-testid="stMain"] [data-testid="stTabs"] [data-baseweb="tab"] { color: #1e293b !important; }
+/* Info / warning / success boxes */
+[data-testid="stMain"] [data-testid="stAlert"] { color: #1e293b !important; }
 </style>
 """
 
