@@ -123,7 +123,8 @@ if page == "Upload":
             else:
                 st.error("Unsupported file type")
                 df = None
-    if df is not None:
+
+            if df is not None:
                 st.session_state.df = df
                 st.success("File uploaded successfully")
                 st.write("Shape:", df.shape)
